@@ -1,39 +1,14 @@
-import React from 'react';
 import { Tabs } from 'expo-router';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useColorScheme } from '@/hooks/useColorScheme';
-import { Colors } from '@/constants/Colors';
+import React from 'react';
 
-import NewsDetailScreen from '@/app/(tabs)/NewsDetailScreen'; // Import NewsDetailScreen
-import HomeScreen from '@/app/(tabs)/index';
 import { TabBarIcon } from '@/components/navigation/TabBarIcon';
+import { Colors } from '@/constants/Colors';
+import { useColorScheme } from '@/hooks/useColorScheme';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
-  const NewsStack = createNativeStackNavigator();
-
-  // Define the News stack navigator with both HomeScreen and NewsDetailScreen
-  function NewsStackScreen() {
-    return (
-      <NewsStack.Navigator>
-        <NewsStack.Screen
-          name="Home"
-          component={index}
-          options={{ headerShown: false }}
-        />
-        <NewsStack.Screen
-          name="NewsDetail"
-          component={NewsDetailScreen}
-          options={{
-            title: 'News Detail',
-            headerBackTitle: 'Back',
-          }}
-        />
-      </NewsStack.Navigator>
-    );
-  }
 
   return (
     <Tabs
@@ -54,7 +29,6 @@ export default function TabLayout() {
             />
           ),
         }}
-        component={NewsStackScreen} // Set the News stack navigator as the component
       />
       <Tabs.Screen
         name="explore" // The Standings tab

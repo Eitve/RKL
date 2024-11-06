@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
-import { TouchableOpacity, ImageBackground, Text, StyleSheet, GestureResponderEvent } from 'react-native';
+import { TouchableOpacity, ImageBackground, Text, StyleSheet, GestureResponderEvent, ImageSourcePropType } from 'react-native';
 
-export default function NewsContainer({ imageSource, title, onPress }) {
+interface NewsContainerProps {
+  imageSource: ImageSourcePropType; // Type for image source (image file)
+  title: string; // Title of the news article
+  onPress: () => void; // Function that is triggered when the card is pressed
+}
+
+export default function NewsContainer({ imageSource, title, onPress }: NewsContainerProps) {
   const [pressStartPosition, setPressStartPosition] = useState({ x: 0, y: 0 });
 
   const handlePressIn = (event: GestureResponderEvent) => {
