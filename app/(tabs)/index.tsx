@@ -1,29 +1,28 @@
 import React from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
-import NewsContainer from '@/components/NewsContainer'; // Assuming NewsContainer is set up correctly
-import { ThemedView } from '@/components/ThemedView'; 
+import { ScrollView } from 'react-native';
+import NewsContainer from '../../components/NewsContainer'; // Import the NewsContainer
 
-export default function Index() {
+const HomeScreen = ({ navigation }: any) => {
+  const newsData = [
+    { title: 'News Title 1', imageSource: require('../../assets/images/exampleNews.jpg') },
+  ];
+
+  const handlePress = (imageSource: any, title: string) => {
+    navigation.navigate('NewsDetail', { imageSource, title });
+  };
+
   return (
-    <ThemedView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
+    <ScrollView>
+      {newsData.map((news, index) => (
         <NewsContainer
-          imageSource={require('@/assets/images/exampleNews.jpg')}
-          title="Taškų lenktynėse – VDU pergalė prieš jaunuosius vilniečius"
-          onPress={() => console.log("News item pressed")} // Placeholder for press handling
+          key={index}
+          imageSource={news.imageSource}
+          title={news.title}
+          onPress={() => handlePress(news.imageSource, news.title)}
         />
-        {/* Add more NewsContainer components here */}
-      </ScrollView>
-    </ThemedView>
+      ))}
+    </ScrollView>
   );
-}
+};
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  scrollContainer: {
-    paddingVertical: 16,
-  },
-});
+export default HomeScreen;

@@ -1,44 +1,39 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
-
-import { TabBarIcon } from '@/components/navigation/TabBarIcon';
-import { Colors } from '@/constants/Colors';
+import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useFonts } from 'expo-font';
+import { useEffect } from 'react';
+import * as SplashScreen from 'expo-splash-screen';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import AntDesign from '@expo/vector-icons/AntDesign';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import NewsContainer from '../../components/NewsContainer'; // Import your NewsContainer component
+import NewsDetailScreen from '../(tabs)/NewsDetailScreen'; // Import the new screen
+import index from '../(tabs)/index'
 
-export default function TabLayout() {
+SplashScreen.preventAutoHideAsync();
+
+const Stack = createNativeStackNavigator();
+
+export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const [loaded] = useFonts({
+    SpaceMono: require('../../assets/fonts/SpaceMono-Regular.ttf'),
+  });
+
+  useEffect(() => {
+    if (loaded) {
+      SplashScreen.hideAsync();
+    }
+  }, [loaded]);
+
+  if (!loaded) {
+    return null;
+  }
 
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
-      }}
-    >
-      <Tabs.Screen
-        name="index" // The News tab
-        options={{
-          title: 'News',
-          tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons
-              name="newspaper-variant-outline"
-              size={24}
-              color="white"
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="explore" // The Standings tab
-        options={{
-          title: 'Standings',
-          tabBarIcon: ({ color, focused }) => (
-            <AntDesign name="barschart" size={24} color="white" />
-          ),
-        }}
-      />
-    </Tabs>
+    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <Stack.Navigator>
+        <Stack.Screen name="index" component={index} options={{ headerShown: false }} />
+        <Stack.Screen name="NewsDetail" component={NewsDetailScreen} />
+      </Stack.Navigator>
+    </ThemeProvider>
   );
 }
