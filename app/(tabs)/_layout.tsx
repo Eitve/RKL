@@ -4,8 +4,7 @@ import { useFonts } from 'expo-font';
 import { useEffect } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import NewsContainer from '../../components/NewsContainer'; // Import your NewsContainer component
-import NewsDetailScreen from '../(tabs)/NewsDetailScreen'; // Import the new screen
+import NewsDetailScreen from '../(tabs)/NewsDetailScreen';
 import index from '../(tabs)/index'
 
 SplashScreen.preventAutoHideAsync();

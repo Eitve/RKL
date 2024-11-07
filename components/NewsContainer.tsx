@@ -2,9 +2,9 @@
   import { TouchableOpacity, ImageBackground, Text, StyleSheet, GestureResponderEvent, ImageSourcePropType } from 'react-native';
 
   interface NewsContainerProps {
-    imageSource: ImageSourcePropType; // Type for image source (image file)
-    title: string; // Title of the news article
-    onPress: () => void; // Function that is triggered when the card is pressed
+    imageSource: ImageSourcePropType;
+    title: string;
+    onPress: () => void;
   }
 
   export default function NewsContainer({ imageSource, title, onPress }: NewsContainerProps) {

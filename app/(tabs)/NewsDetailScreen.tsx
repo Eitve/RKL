@@ -1,31 +1,41 @@
 import React from 'react';
-import { View, ImageBackground, Text, StyleSheet } from 'react-native';
+import { View, Image, Text, StyleSheet, ScrollView } from 'react-native';
 
-const NewsDetailScreen = () => {
+const NewsDetailScreen = ({ route }: any) => {
+  const { imageSource, title, content } = route.params;
+
   return (
-    <View style={styles.container}>
-      <ImageBackground source={{ uri: 'your-image-url' }} style={styles.image}>
-        <Text style={styles.title}>News Title</Text>
-      </ImageBackground>
-    </View>
+    <ScrollView style={styles.container}>
+      <Image source={imageSource} style={styles.image} />
+      <Text style={styles.title}>{title}</Text>
+      <Text style={styles.content}>{content}</Text>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: '#fff',
   },
   image: {
     width: '100%',
-    height: '100%',
-    justifyContent: 'flex-end',
+    height: 200,
+    resizeMode: 'cover',
   },
   title: {
     fontSize: 24,
-    color: 'white',
+    fontWeight: 'bold',
+    color: 'black',
     padding: 10,
+    textAlign: 'center',
+  },
+  content: {
+    fontSize: 16,
+    color: 'black',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    lineHeight: 24,
   },
 });
 
