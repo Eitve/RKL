@@ -1,63 +1,76 @@
-// Player.tsx
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 
-type PlayerProps = {
-  picture: string;
+interface PlayerData {
   firstName: string;
   lastName: string;
-  height: string;
-  weight: string;
-  number: number;
-  team: string;
-};
+  photoURL: string;
+  age: number;
+  dob: string;
+  position: string;
+  s2PAPG: number;
+  s2PMPG: number;
+  s2pPercent: number;
+  s3PAPG: number;
+  s3PMPG: number;
+  s3pPercent: number;
+  sAPG: number;
+  sBLKPG: number;
+  sEFF: number;
+  sFOPG: number;
+  sFTPercent: number;
+  sFTAPG: number;
+  sFTMPG: number;
+  sGP: number;
+  sMPG: number;
+  sPFPG: number;
+  sPPG: number;
+  sRPG: number;
+  sSTPG: number;
+  sTOPG: number;
+  shirtNumber: number;
+  weight: number;
+}
 
-const Player: React.FC<PlayerProps> = ({ picture, firstName, lastName, height, weight, number, team }) => {
+interface PlayerProps {
+  playerData: PlayerData;
+}
+
+const Player: React.FC<PlayerProps> = ({ playerData }) => {
   return (
     <View style={styles.container}>
-      <Image source={{ uri: picture }} style={styles.image} />
-      <View style={styles.infoContainer}>
-        <Text style={styles.name}>{firstName} {lastName}</Text>
-        <Text style={styles.detail}>Team: {team}</Text>
-        <Text style={styles.detail}>Number: #{number}</Text>
-        <Text style={styles.detail}>Height: {height}</Text>
-        <Text style={styles.detail}>Weight: {weight}</Text>
-      </View>
+      <Image source={{ uri: playerData.photoURL }} style={styles.photo} />
+      <Text style={styles.name}>{playerData.firstName} {playerData.lastName}</Text>
+      <Text>Position: {playerData.position}</Text>
+      <Text>Age: {playerData.age}</Text>
+      <Text>Shirt Number: {playerData.shirtNumber}</Text>
+      <Text>PPG: {playerData.sPPG}</Text>
+      <Text>RPG: {playerData.sRPG}</Text>
+      <Text>APG: {playerData.sAPG}</Text>
+      <Text>EFF: {playerData.sEFF}</Text>
+      <Text>Weight: {playerData.weight} kg</Text>
+      {/* Additional stats can be displayed here as needed */}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    marginBottom: 20,
     padding: 10,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.5,
-    elevation: 2,
-    marginVertical: 5,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 10,
   },
-  image: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginRight: 15,
-  },
-  infoContainer: {
-    flex: 1,
+  photo: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginBottom: 10,
   },
   name: {
     fontSize: 18,
     fontWeight: 'bold',
-  },
-  detail: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 3,
+    marginBottom: 5,
   },
 });
 
