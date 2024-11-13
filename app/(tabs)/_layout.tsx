@@ -1,15 +1,19 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useFonts } from 'expo-font';
-import { useEffect } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
+import { useEffect } from 'react';
+import 'react-native-reanimated';
+
 import { useColorScheme } from '@/hooks/useColorScheme';
-import NewsDetailScreen from '../(tabs)/NewsDetailScreen';
-import index from '../(tabs)/index'
+import HomeScreen from './index'; // Ensure this is the correct import for the home screen
+import NewsDetailScreen from './NewsDetailScreen'; // Ensure this is the correct import for the details screen
+import StandingsScreen from './standings';
 
+const Tab = createBottomTabNavigator();
+
+// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
-
-const Stack = createNativeStackNavigator();
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -29,10 +33,20 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack.Navigator>
-        <Stack.Screen name="index" component={index} options={{ headerShown: false }} />
-        <Stack.Screen name="NewsDetail" component={NewsDetailScreen} />
-      </Stack.Navigator>
+      {/* Use Tab.Navigator for bottom tab navigation */}
+      <Tab.Navigator>
+        <Tab.Screen 
+          name="Home" 
+          component={HomeScreen} // Use HomeScreen as the component for the Home tab
+          options={{ tabBarLabel: 'Home' }} 
+        />
+        <Tab.Screen 
+          name="Standings" 
+          component={StandingsScreen} 
+          options={{ tabBarLabel: 'Standings' }} 
+        />
+        {/* Add more tabs here if needed */}
+      </Tab.Navigator>
     </ThemeProvider>
   );
 }
