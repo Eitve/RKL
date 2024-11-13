@@ -1,68 +1,54 @@
-  import React, { useState } from 'react';
-  import { TouchableOpacity, ImageBackground, Text, StyleSheet, GestureResponderEvent, ImageSourcePropType } from 'react-native';
+// NewsContainer.tsx
+import React from 'react';
+import { View, Text, ImageBackground, TouchableOpacity, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-  interface NewsContainerProps {
-    imageSource: ImageSourcePropType;
-    title: string;
-    onPress: () => void;
-  }
+interface NewsContainerProps {
+  title: string;
+  content: string;
+  imageURL: string;
+  onPress: () => void; // Add a prop to handle press events
+}
 
-  export default function NewsContainer({ imageSource, title, onPress }: NewsContainerProps) {
-    const [pressStartPosition, setPressStartPosition] = useState({ x: 0, y: 0 });
-
-    const handlePressIn = (event: GestureResponderEvent) => {
-      const { pageX, pageY } = event.nativeEvent;
-      setPressStartPosition({ x: pageX, y: pageY });
-    };
-
-    const handlePressOut = (event: GestureResponderEvent) => {
-      const { pageX, pageY } = event.nativeEvent;
-      const distanceX = Math.abs(pageX - pressStartPosition.x);
-      const distanceY = Math.abs(pageY - pressStartPosition.y);
-
-      if (distanceX < 5 && distanceY < 5) {
-        onPress();
-      }
-    };
-
-    return (
-      <TouchableOpacity
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        style={styles.card}
-        activeOpacity={1}
+const NewsContainer: React.FC<NewsContainerProps> = ({ title, content, imageURL, onPress }) => {
+  return (
+    <SafeAreaView>
+    <TouchableOpacity onPress={onPress} style={styles.container}>
+      <ImageBackground
+        source={{ uri: imageURL }}
+        style={styles.imageBackground}
+        resizeMode="cover"
       >
-        <ImageBackground
-          source={imageSource}
-          style={styles.backgroundImage}
-          imageStyle={styles.imageStyle}
-        >
+        <View style={styles.textContainer}>
           <Text style={styles.title}>{title}</Text>
-        </ImageBackground>
-      </TouchableOpacity>
-    );
-  }
+        </View>
+      </ImageBackground>
+    </TouchableOpacity>
+    </SafeAreaView>
+  );
+};
 
-  const styles = StyleSheet.create({
-    card: {
-      width: '100%',
-      aspectRatio: 16 / 9,
-      borderRadius: 10,
-      overflow: 'hidden',
-      marginBottom: 16,
-    },
-    backgroundImage: {
-      flex: 1,
-      justifyContent: 'flex-end',
-    },
-    imageStyle: {
-      borderRadius: 10,
-    },
-    title: {
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      color: 'white',
-      fontSize: 18,
-      padding: 8,
-      textAlign: 'center',
-    },
-  });
+const styles = StyleSheet.create({
+  container: {
+    marginBottom: 20,
+  },
+  imageBackground: {
+    width: '100%',
+    height: 200, // Set your preferred height
+    justifyContent: 'flex-end', // Align text at the bottom of the image
+  },
+  textContainer: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Add a semi-transparent overlay for readability
+    padding: 10,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff', // Make text white for contrast
+  },
+  content: {
+    color: '#fff',
+  },
+});
+
+export default NewsContainer;
