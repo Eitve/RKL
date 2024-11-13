@@ -1,11 +1,9 @@
-// NewsDetailScreen.tsx
 import React from 'react';
 import { View, Text, Image, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RouteProp } from '@react-navigation/native';
-import { RootStackParamList } from '../types'; // Adjust the import path as needed
+import { RootStackParamList } from '../types';
 
-// Define the route prop type for this screen
 type NewsDetailScreenRouteProp = RouteProp<RootStackParamList, 'NewsDetail'>;
 
 interface Props {

@@ -54,7 +54,7 @@ const Team: React.FC<{ teamName: string }> = ({ teamName }) => {
   useEffect(() => {
     const fetchTeamData = async () => {
       try {
-        // Access team document
+
         const teamDocRef = doc(firestore, 'teams', teamName);
         const teamDoc = await getDoc(teamDocRef);
 
@@ -62,13 +62,12 @@ const Team: React.FC<{ teamName: string }> = ({ teamName }) => {
           setTeamData(teamDoc.data() as Team);
         }
 
-        // Access players subcollection within the team document
         const playersCollectionRef = collection(firestore, `teams/${teamName}/players`);
         const playersSnapshot = await getDocs(playersCollectionRef);
 
         const playersData = playersSnapshot.docs.map((doc) => ({
           ...(doc.data() as PlayerData),
-          id: doc.id, // Add the id from Firestore as a field without duplication
+          id: doc.id,
         }));
 
         setPlayers(playersData);
@@ -87,7 +86,7 @@ const Team: React.FC<{ teamName: string }> = ({ teamName }) => {
   return (
     <View style={styles.container}>
       <Image source={{ uri: teamData.teamPhoto }} style={styles.teamPhoto} />
-      <Text style={styles.teamName}>{teamData.teamName}</Text>
+      <Text style={styles.teamName}><Image source={{ uri: teamData.icon }} style={styles.icon} /> {teamData.teamName}</Text>
       <Text>Head Coach: {teamData.headCoach}</Text>
       <Text>Assistant Coach: {teamData.assistantCoach}</Text>
       <Text>Manager: {teamData.teamManager}</Text>
@@ -122,10 +121,17 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 10,
   },
+  icon: {
+    width: 80,
+    height: 80,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
   teamName: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 10,
+    marginTop: -10,
   },
   subheading: {
     fontSize: 18,

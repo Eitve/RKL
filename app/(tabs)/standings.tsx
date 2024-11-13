@@ -4,7 +4,7 @@ import { View } from 'react-native';
 export default function StandingsScreen() {
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      {/* Intentionally blank view with no text content */}
+      {}
     </View>
   );
 }

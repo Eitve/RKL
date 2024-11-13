@@ -49,7 +49,7 @@ const Player: React.FC<PlayerProps> = ({ playerData }) => {
       <Text>APG: {playerData.sAPG}</Text>
       <Text>EFF: {playerData.sEFF}</Text>
       <Text>Weight: {playerData.weight} kg</Text>
-      {/* Additional stats can be displayed here as needed */}
+      {}
     </View>
   );
 };

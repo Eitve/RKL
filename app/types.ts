@@ -1,4 +1,3 @@
-// types.ts (or in the same file if preferred)
 export type RootStackParamList = {
     Index: undefined;
     NewsDetail: {

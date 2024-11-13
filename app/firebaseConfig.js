@@ -1,9 +1,6 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';  // Ensure getFirestore is imported from firestore
+import { getFirestore } from 'firebase/firestore';
 
-
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyBAtiQi_lIDAgOZwmWugJ3mf5TVVICVhTU",
   authDomain: "rklmobile.firebaseapp.com",
@@ -14,7 +11,6 @@ const firebaseConfig = {
   measurementId: "G-MYCM8WXQ6T"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const firestore = getFirestore(app);
 

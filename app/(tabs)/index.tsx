@@ -1,4 +1,3 @@
-// index.tsx
 import React, { useEffect, useState } from 'react';
 import { View, FlatList, StyleSheet } from 'react-native';
 import { firestore } from '../firebaseConfig';
@@ -6,7 +5,7 @@ import { collection, getDocs } from 'firebase/firestore';
 import NewsContainer from '../../components/NewsContainer';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { RootStackParamList } from '../types'; // Adjust the import path as needed
+import { RootStackParamList } from '../types';
 
 interface NewsItem {
   id: string;
@@ -30,7 +29,6 @@ const IndexScreen = () => {
           ...(doc.data() as Omit<NewsItem, "id">),
         })) as NewsItem[];
 
-        // Sort by `number` field in descending order
         newsList.sort((a, b) => b.number - a.number);
 
         setNewsData(newsList);

@@ -1,8 +1,6 @@
-// statistics.tsx
-
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, FlatList } from 'react-native';
-import { firestore } from '../firebaseConfig'; // Import Firestore configuration
+import { firestore } from '../firebaseConfig';
 import { collection, getDocs } from 'firebase/firestore';
 import Team from '../../components/team';
 
@@ -12,24 +10,22 @@ type PlayerProps = {
 };
 
 type TeamProps = {
-  id: string; // Document ID from Firestore
+  id: string;
   teamName: string;
-  icon: string; // URL for the team icon
-  players: PlayerProps[]; // Players array will be fetched and added
+  icon: string;
+  players: PlayerProps[];
 };
 
 const Statistics: React.FC = () => {
   const [teams, setTeams] = useState<TeamProps[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch teams from Firestore
   useEffect(() => {
     const fetchTeamsWithPlayers = async () => {
       try {
         const teamsCollection = collection(firestore, 'teams');
         const teamSnapshot = await getDocs(teamsCollection);
         
-        // Fetch players for each team document
         const teamsList: TeamProps[] = await Promise.all(
           teamSnapshot.docs.map(async (teamDoc) => {
             const teamData = teamDoc.data() as Omit<TeamProps, 'id' | 'players'>;
