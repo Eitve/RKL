@@ -4,6 +4,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import HomeScreen from './index';  // Assuming `index.tsx` is your home screen file
 import StandingsScreen from './standings';
 import NewsDetailScreen from './NewsDetailScreen';
+import ScheduleScreen from './schedule';
+import StatisticsScreen from './statistics';
 import { ThemeProvider, createTheme } from '@rneui/themed';
 
 const Tab = createBottomTabNavigator();
@@ -38,9 +40,11 @@ function HomeStackScreen() {
 export default function AppTabs() {
   return (
     <ThemeProvider theme={theme}>
-      <Tab.Navigator>
-        <Tab.Screen name="Home" component={HomeStackScreen} options={{ headerShown: false }} />
+      <Tab.Navigator initialRouteName="Home">
+        <Tab.Screen name="Schedule" component={ScheduleScreen} options={{ headerShown: false }} />
         <Tab.Screen name="Standings" component={StandingsScreen} options={{ headerShown: false }} />
+        <Tab.Screen name="Home" component={HomeStackScreen} options={{ headerShown: false }} />
+        <Tab.Screen name="Statistics" component={StatisticsScreen} options={{ headerShown: false }} />
       </Tab.Navigator>
     </ThemeProvider>
   );
