@@ -14,46 +14,31 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-
+// Team and Players Data
 const teamData = {
-  achievements: [
-    "2015-2016: RKL A divizione pasiekė 1/8 finalo etapą;",
-    "2016-2017: RKL A divizione pasiekė 1/8 finalo etapą;",
-    "2017-2018: RKL A divizione užėmė 14-ąją vietą;",
-    "2019-2020: RKL A divizione užėmė 16-ąją vietą;",
-    "2020-2021: RKL A divizione užėmė 14-ąją vietą;",
-    "2021-2022: RKL A divizione užėmė 13-ąją vietą."
-  ],
-  nameChanges: [
-    "2019-2020: Lietuvos sporto universitetas (RKL A divizionas);",
-    "2020-2021: Kauno „LSU-Atletas“ (RKL A divizionas);",
-    "2022-2023: Lietuvos sporto universitetas (LSU) (RKL B divizionas);"
-  ],
-  assistantCoach: "Kęstutis Kemzūra",
-  division: "B-B", // As per instruction
+  teamID: "palangosSportoCentras",
+  teamName: "Palangos Sporto Centras",
+  assistantCoach: "Mindaugas Reminas",
+  division: "B-A",
+  headCoach: "Regimantas Juška",
   gamesPlayed: 0,
-  headCoach: "Ramūnas Butautas",
-  icon: "https://images.statsengine.playbyplay.api.geniussports.com/2e34f6aec38ac61aaa38632e0319fb40S1.png", // Placeholder left empty as requested
+  icon: "https://images.statsengine.playbyplay.api.geniussports.com/20b65625d6c13",
   losses: 0,
-  ptsDifference: 0,
-  ptsMinus: 0,
-  ptsPlus: 0,
+  wins: 0,
   standingPoints: 0,
-  teamID: "lietuvosSportoUniversitetas", // Unique identifier
-  teamManager: "Deimantas Valavičius",
-  teamName: "Lietuvos sporto universitetas",
-  teamPhoto: "https://images.statsengine.playbyplay.api.geniussports.com/2e34f6aec38ac61aaa38632e0319fb40S1.png", // Placeholder left empty as requested
-  wins: 0
+  ptsDifference: 0,
+  ptsPlus: 0,
+  ptsMinus: 0,
+  teamManager: "Saulius Simė",
+  teamPhoto: "",
+  achievements: [], // Empty array for future strings
+  nameChanges: [], // Empty array for future strings
 };
-
-
-
-
 
 const players = [
   {
-    firstName: "Filler",
-    lastName: "Player",
+    firstName: "Jonas",
+    lastName: "Zabitis",
     dob: "2008-08-10",
     position: "SG",
     age: 15,
