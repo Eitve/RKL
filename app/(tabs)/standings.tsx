@@ -379,6 +379,16 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     backgroundColor: '#ccc',
   },
+  teamCell: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
+  teamName: {
+    fontSize: 14,
+    color: '#000',
+    marginLeft: 5,
+  },
 });
 
 export default StandingsScreen;
