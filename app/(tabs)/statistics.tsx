@@ -7,6 +7,14 @@ import Team from '../../components/team';
 type PlayerProps = {
   firstName: string;
   lastName: string;
+  dob?: string;
+  position?: string;
+  age?: number;
+  nationality?: string;
+  height?: number;
+  weight?: number;
+  shirtNumber?: number | null;
+  photoURL?: string;
 };
 
 type TeamProps = {
@@ -25,21 +33,42 @@ const Statistics: React.FC = () => {
       try {
         const teamsCollection = collection(firestore, 'teams');
         const teamSnapshot = await getDocs(teamsCollection);
-        
+
+        // Fetch all teams and their players
         const teamsList: TeamProps[] = await Promise.all(
           teamSnapshot.docs.map(async (teamDoc) => {
-            const teamData = teamDoc.data() as Omit<TeamProps, 'id' | 'players'>;
+            const teamData = teamDoc.data() as Partial<Omit<TeamProps, 'id' | 'players'>>;
+
+            // Default values for missing team data
+            const teamName = teamData.teamName || 'Unknown Team';
+            const icon = teamData.icon || '';
+
             const playersCollection = collection(firestore, `teams/${teamDoc.id}/players`);
             const playersSnapshot = await getDocs(playersCollection);
 
             const playersList: PlayerProps[] = playersSnapshot.docs.map((playerDoc) => {
-              return playerDoc.data() as PlayerProps;
+              const playerData = playerDoc.data();
+
+              // Fallback for missing player fields
+              return {
+                firstName: playerData.firstName || 'N/A',
+                lastName: playerData.lastName || 'N/A',
+                dob: playerData.dob || 'N/A',
+                position: playerData.position || 'N/A',
+                age: playerData.age || 0,
+                nationality: playerData.nationality || 'N/A',
+                height: playerData.height || 0,
+                weight: playerData.weight || 0,
+                shirtNumber: playerData.shirtNumber ?? null,
+                photoURL: playerData.photoURL || '',
+              };
             });
 
-            return { id: teamDoc.id, ...teamData, players: playersList };
+            return { id: teamDoc.id, teamName, icon, players: playersList };
           })
         );
 
+        // Update state with the complete list of teams and players
         setTeams(teamsList);
       } catch (error) {
         console.error('Error fetching teams and players:', error);
@@ -63,7 +92,6 @@ const Statistics: React.FC = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Statistics</Text>
-      
       <FlatList
         data={teams}
         keyExtractor={(item) => item.id}
