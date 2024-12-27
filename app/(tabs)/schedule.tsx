@@ -1,7 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { SafeAreaView, View, Text, Image, FlatList, StyleSheet, Switch } from 'react-native';
+import {
+  SafeAreaView,
+  View,
+  Text,
+  Image,
+  FlatList,
+  StyleSheet,
+  Switch,
+  TouchableOpacity,
+} from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { firestore } from '../firebaseConfig';
 import { collection, getDocs } from 'firebase/firestore';
+
+import { ScheduleStackParamList } from './ScheduleStack';
 
 type GameProps = {
   gameID: number;
@@ -18,11 +31,18 @@ type TeamProps = {
   icon: string;
 };
 
+type ScheduleScreenNavigationProp = NativeStackNavigationProp<
+  ScheduleStackParamList,
+  'ScheduleMain'
+>;
+
 const ScheduleScreen = () => {
+  const navigation = useNavigation<ScheduleScreenNavigationProp>();
+
   const [games, setGames] = useState<GameProps[]>([]);
   const [teams, setTeams] = useState<Map<string, TeamProps>>(new Map());
-  const [isResultsView, setIsResultsView] = useState(false); // Switch for Schedule/Results
-  const [isDivisionB, setIsDivisionB] = useState(false); // Switch for Division A/B
+  const [isResultsView, setIsResultsView] = useState(false);
+  const [isDivisionB, setIsDivisionB] = useState(false); 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -30,7 +50,6 @@ const ScheduleScreen = () => {
       try {
         setLoading(true);
 
-        // Fetch teams
         const teamsCollection = collection(firestore, 'teams');
         const teamSnapshot = await getDocs(teamsCollection);
         const teamMap = new Map<string, TeamProps>();
@@ -42,11 +61,8 @@ const ScheduleScreen = () => {
             icon: data.icon || '',
           });
         });
-
-        console.log('Loaded Teams:', Array.from(teamMap.keys())); // Debugging
         setTeams(teamMap);
 
-        // Fetch games
         const gamesCollection = collection(firestore, 'games');
         const gameSnapshot = await getDocs(gamesCollection);
         const gamesList: GameProps[] = gameSnapshot.docs.map((doc) => {
@@ -61,7 +77,6 @@ const ScheduleScreen = () => {
           };
         });
 
-        console.log('Loaded Games:', gamesList); // Debugging
         setGames(gamesList);
       } catch (error) {
         console.error('Error fetching games or teams:', error);
@@ -75,36 +90,36 @@ const ScheduleScreen = () => {
 
   const filteredGames = games.filter((game) => {
     const isDivisionMatch = game.division === (isDivisionB ? 'B' : 'A');
-
-    const isResultsViewMatch =
-      isResultsView
-        ? game.finalPointsHome !== null && game.finalPointsAway !== null
-        : game.finalPointsHome === null && game.finalPointsAway === null;
+    const isResultsViewMatch = isResultsView
+      ? game.finalPointsHome !== null && game.finalPointsAway !== null
+      : game.finalPointsHome === null && game.finalPointsAway === null;
 
     return isDivisionMatch && isResultsViewMatch;
   });
 
-  const renderGame = ({ item }: { item: GameProps }) => {
-    const homeTeam = teams.get(item.homeTeam); // Match homeTeam with teamID
-    const awayTeam = teams.get(item.awayTeam); // Match awayTeam with teamID
+  const handleGamePress = (game: GameProps) => {
+    navigation.navigate('GameDetails', { gameID: game.gameID });
+  };
 
-    console.log(`Game ID: ${item.gameID}`);
-    console.log(`HomeTeam: ${item.homeTeam}, Match:`, homeTeam ? homeTeam.name : 'Not Found');
-    console.log(`AwayTeam: ${item.awayTeam}, Match:`, awayTeam ? awayTeam.name : 'Not Found');
+  const renderGame = ({ item }: { item: GameProps }) => {
+    const homeTeam = teams.get(item.homeTeam);
+    const awayTeam = teams.get(item.awayTeam);
 
     if (!homeTeam || !awayTeam) {
       return (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>
-            Missing data for teams in GameID: {item.gameID}
+            Missing team data for GameID: {item.gameID}
           </Text>
         </View>
       );
     }
 
     return (
-      <View style={styles.gameContainer}>
-        {/* Home Team */}
+      <TouchableOpacity
+        style={styles.gameContainer}
+        onPress={() => handleGamePress(item)}
+      >
         <View style={styles.teamRow}>
           <View style={styles.teamInfo}>
             <Image source={{ uri: homeTeam.icon }} style={styles.teamIcon} />
@@ -113,7 +128,6 @@ const ScheduleScreen = () => {
           <Text style={styles.teamPoints}>{item.finalPointsHome ?? '-'}</Text>
         </View>
 
-        {/* Away Team */}
         <View style={styles.teamRow}>
           <View style={styles.teamInfo}>
             <Image source={{ uri: awayTeam.icon }} style={styles.teamIcon} />
@@ -121,13 +135,12 @@ const ScheduleScreen = () => {
           </View>
           <Text style={styles.teamPoints}>{item.finalPointsAway ?? '-'}</Text>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Schedule/Results Switch */}
       <View style={styles.switchRow}>
         <Text style={styles.switchLabel}>Schedule</Text>
         <Switch
@@ -138,7 +151,6 @@ const ScheduleScreen = () => {
         <Text style={styles.switchLabel}>Results</Text>
       </View>
 
-      {/* Division A/B Switch */}
       <View style={styles.switchRow}>
         <Text style={styles.switchLabel}>Division A</Text>
         <Switch
@@ -149,7 +161,6 @@ const ScheduleScreen = () => {
         <Text style={styles.switchLabel}>Division B</Text>
       </View>
 
-      {/* Game List */}
       {loading ? (
         <Text style={styles.loadingText}>Loading...</Text>
       ) : (
@@ -171,7 +182,7 @@ const styles = StyleSheet.create({
   },
   switchRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between', // Align items to the sides
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginVertical: 10,
   },
