@@ -12,9 +12,8 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { firestore } from '../firebaseConfig';
-import { collection, getDocs } from 'firebase/firestore';
-
-import { ScheduleStackParamList } from './ScheduleStack';
+import { collection, getDocs, Timestamp } from 'firebase/firestore';
+import { ScheduleStackParamList } from './_layout';
 
 type GameProps = {
   gameID: number;
@@ -23,6 +22,15 @@ type GameProps = {
   finalPointsHome: number | null;
   finalPointsAway: number | null;
   division: 'A' | 'B';
+};
+
+type ScheduledGameProps = {
+  homeTeam: string;
+  awayTeam: string;
+  division: 'A' | 'B';
+  arena?: string;
+  dateObj: Date;
+  dateStr: string;
 };
 
 type TeamProps = {
@@ -38,22 +46,21 @@ type ScheduleScreenNavigationProp = NativeStackNavigationProp<
 
 const ScheduleScreen = () => {
   const navigation = useNavigation<ScheduleScreenNavigationProp>();
-
   const [games, setGames] = useState<GameProps[]>([]);
+  const [scheduledGames, setScheduledGames] = useState<ScheduledGameProps[]>([]);
   const [teams, setTeams] = useState<Map<string, TeamProps>>(new Map());
   const [isResultsView, setIsResultsView] = useState(false);
-  const [isDivisionB, setIsDivisionB] = useState(false); 
+  const [isDivisionB, setIsDivisionB] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchGamesAndTeams = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
 
-        const teamsCollection = collection(firestore, 'teams');
-        const teamSnapshot = await getDocs(teamsCollection);
+        const teamsSnap = await getDocs(collection(firestore, 'teams'));
         const teamMap = new Map<string, TeamProps>();
-        teamSnapshot.docs.forEach((doc) => {
+        teamsSnap.docs.forEach((doc) => {
           const data = doc.data() as any;
           teamMap.set(data.teamID, {
             id: data.teamID,
@@ -63,9 +70,8 @@ const ScheduleScreen = () => {
         });
         setTeams(teamMap);
 
-        const gamesCollection = collection(firestore, 'games');
-        const gameSnapshot = await getDocs(gamesCollection);
-        const gamesList: GameProps[] = gameSnapshot.docs.map((doc) => {
+        const gamesSnap = await getDocs(collection(firestore, 'games'));
+        const completedGames: GameProps[] = gamesSnap.docs.map((doc) => {
           const data = doc.data() as any;
           return {
             gameID: data.gameID || 0,
@@ -76,36 +82,69 @@ const ScheduleScreen = () => {
             division: data.division || 'A',
           };
         });
+        setGames(completedGames);
 
-        setGames(gamesList);
+        const scheduledSnap = await getDocs(collection(firestore, 'scheduledGames'));
+        const upcoming: ScheduledGameProps[] = [];
+        scheduledSnap.docs.forEach((doc) => {
+          const data = doc.data() as any;
+          let dateObj = new Date();
+          if (data.gameDate instanceof Timestamp) {
+            dateObj = data.gameDate.toDate();
+          } else if (typeof data.gameDate === 'string') {
+            dateObj = new Date(data.gameDate);
+          }
+
+          const datePart = dateObj.toLocaleDateString();
+          const timePart = dateObj.toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+          const dateStr = `${datePart} ${timePart}`;
+
+          upcoming.push({
+            homeTeam: data.homeTeam || '',
+            awayTeam: data.awayTeam || '',
+            division: data.division || 'A',
+            arena: data.arena || '',
+            dateObj,
+            dateStr,
+          });
+        });
+        upcoming.sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
+        setScheduledGames(upcoming);
       } catch (error) {
-        console.error('Error fetching games or teams:', error);
+        console.error('Error fetching schedule data:', error);
       } finally {
         setLoading(false);
       }
     };
-
-    fetchGamesAndTeams();
+    fetchData();
   }, []);
 
-  const filteredGames = games.filter((game) => {
-    const isDivisionMatch = game.division === (isDivisionB ? 'B' : 'A');
-    const isResultsViewMatch = isResultsView
-      ? game.finalPointsHome !== null && game.finalPointsAway !== null
-      : game.finalPointsHome === null && game.finalPointsAway === null;
+  const isDivisionMatch = (division: 'A' | 'B') =>
+    division === (isDivisionB ? 'B' : 'A');
 
-    return isDivisionMatch && isResultsViewMatch;
-  });
+  const filteredResults = games.filter(
+    (g) =>
+      isDivisionMatch(g.division) &&
+      g.finalPointsHome !== null &&
+      g.finalPointsAway !== null
+  );
+
+  const filteredSchedule = scheduledGames.filter((sg) =>
+    isDivisionMatch(sg.division)
+  );
 
   const handleGamePress = (game: GameProps) => {
     navigation.navigate('GameDetails', { gameID: game.gameID });
   };
 
-  const renderGame = ({ item }: { item: GameProps }) => {
-    const homeTeam = teams.get(item.homeTeam);
-    const awayTeam = teams.get(item.awayTeam);
+  const renderCompletedGame = ({ item }: { item: GameProps }) => {
+    const homeTeamDoc = teams.get(item.homeTeam);
+    const awayTeamDoc = teams.get(item.awayTeam);
 
-    if (!homeTeam || !awayTeam) {
+    if (!homeTeamDoc || !awayTeamDoc) {
       return (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>
@@ -116,26 +155,58 @@ const ScheduleScreen = () => {
     }
 
     return (
-      <TouchableOpacity
-        style={styles.gameContainer}
-        onPress={() => handleGamePress(item)}
-      >
+      <TouchableOpacity style={styles.gameContainer} onPress={() => handleGamePress(item)}>
         <View style={styles.teamRow}>
           <View style={styles.teamInfo}>
-            <Image source={{ uri: homeTeam.icon }} style={styles.teamIcon} />
-            <Text style={styles.teamName}>{homeTeam.name}</Text>
+            <Image source={{ uri: homeTeamDoc.icon }} style={styles.teamIconResults} />
+            <Text style={styles.teamName}>{homeTeamDoc.name}</Text>
           </View>
           <Text style={styles.teamPoints}>{item.finalPointsHome ?? '-'}</Text>
         </View>
-
         <View style={styles.teamRow}>
           <View style={styles.teamInfo}>
-            <Image source={{ uri: awayTeam.icon }} style={styles.teamIcon} />
-            <Text style={styles.teamName}>{awayTeam.name}</Text>
+            <Image source={{ uri: awayTeamDoc.icon }} style={styles.teamIconResults} />
+            <Text style={styles.teamName}>{awayTeamDoc.name}</Text>
           </View>
           <Text style={styles.teamPoints}>{item.finalPointsAway ?? '-'}</Text>
         </View>
       </TouchableOpacity>
+    );
+  };
+
+  const renderScheduledGame = ({ item }: { item: ScheduledGameProps }) => {
+    const homeTeamDoc = teams.get(item.homeTeam);
+    const awayTeamDoc = teams.get(item.awayTeam);
+
+    return (
+      <View style={styles.gameContainer}>
+        <View style={styles.teamRow}> {/* Home Team Row */}
+          <Image
+            source={{ uri: homeTeamDoc?.icon || '' }}
+            style={styles.teamIconScheduled}
+          />
+          <Text style={styles.teamName}>{homeTeamDoc?.name || item.homeTeam}</Text>
+        </View>
+    
+        <View style={styles.vsText}> {/* VS Row */}
+          <Text style={styles.vsText}>vs</Text>
+        </View>
+    
+        <View style={styles.teamRow}> {/* Away Team Row */}
+          <Image
+            source={{ uri: awayTeamDoc?.icon || '' }}
+            style={styles.teamIconScheduled}
+          />
+          <Text style={styles.teamName}>{awayTeamDoc?.name || item.awayTeam}</Text>
+        </View>
+    
+        <View style={styles.bottomRow}> {/* Bottom Row with Arena and Date */}
+          <Text style={styles.arenaText}>
+            {item.arena ? `Arena: ${item.arena}` : ''}
+          </Text>
+          <Text style={styles.gameDateText}>{item.dateStr}</Text>
+        </View>
+      </View>
     );
   };
 
@@ -145,7 +216,7 @@ const ScheduleScreen = () => {
         <Text style={styles.switchLabel}>Schedule</Text>
         <Switch
           value={isResultsView}
-          onValueChange={(value) => setIsResultsView(value)}
+          onValueChange={(val) => setIsResultsView(val)}
           style={styles.switch}
         />
         <Text style={styles.switchLabel}>Results</Text>
@@ -155,7 +226,7 @@ const ScheduleScreen = () => {
         <Text style={styles.switchLabel}>Division A</Text>
         <Switch
           value={isDivisionB}
-          onValueChange={(value) => setIsDivisionB(value)}
+          onValueChange={(val) => setIsDivisionB(val)}
           style={styles.switch}
         />
         <Text style={styles.switchLabel}>Division B</Text>
@@ -163,16 +234,24 @@ const ScheduleScreen = () => {
 
       {loading ? (
         <Text style={styles.loadingText}>Loading...</Text>
+      ) : isResultsView ? (
+        <FlatList
+          data={filteredResults}
+          keyExtractor={(item) => item.gameID.toString()}
+          renderItem={renderCompletedGame}
+        />
       ) : (
         <FlatList
-          data={filteredGames}
-          keyExtractor={(item) => item.gameID.toString()}
-          renderItem={renderGame}
+          data={filteredSchedule}
+          keyExtractor={(_, index) => index.toString()}
+          renderItem={renderScheduledGame}
         />
       )}
     </SafeAreaView>
   );
 };
+
+export default ScheduleScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -193,6 +272,11 @@ const styles = StyleSheet.create({
   switch: {
     marginHorizontal: 10,
   },
+  loadingText: {
+    textAlign: 'center',
+    fontSize: 16,
+    marginTop: 20,
+  },
   gameContainer: {
     padding: 10,
     marginVertical: 5,
@@ -203,34 +287,55 @@ const styles = StyleSheet.create({
   },
   teamRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginVertical: 5,
+    marginVertical: 4,
+    justifyContent: 'space-between',
+  },
+  bottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 6,
   },
   teamInfo: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  teamIcon: {
+  teamIconResults: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    marginRight: 10,
+    marginRight: 8,
+  },
+  teamIconScheduled: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 8,
   },
   teamName: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
   },
+  vsText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#000',
+    marginHorizontal: 10,
+  },
+  gameDateText: {
+    fontSize: 14,
+    color: '#555',
+  },
+  arenaText: {
+    fontSize: 14,
+    color: '#555',
+    maxWidth: '65%',
+  },
   teamPoints: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#007bff',
-  },
-  loadingText: {
-    textAlign: 'center',
-    fontSize: 16,
-    marginTop: 20,
   },
   errorContainer: {
     padding: 10,
@@ -241,5 +346,3 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
-
-export default ScheduleScreen;
