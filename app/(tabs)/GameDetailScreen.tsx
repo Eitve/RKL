@@ -3,7 +3,7 @@ import {View, Text, StyleSheet, ActivityIndicator, ScrollView, Image,} from 'rea
 import { RouteProp, useRoute } from '@react-navigation/native';
 import {doc, getDoc, collection, getDocs, query, where,} from 'firebase/firestore';
 import { firestore } from '../firebaseConfig';
-import { ScheduleStackParamList } from './ScheduleStack';
+import { ScheduleStackParamList } from './_layout';
 
 function normalizeID(input: string): string {
   return input
