@@ -1,80 +1,54 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { SafeAreaView, View, Text, Image, FlatList, ActivityIndicator, Pressable } from 'react-native';
+import {
+  SafeAreaView,
+  View,
+  Text,
+  Image,
+  FlatList,
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  ScrollView,
+} from 'react-native';
 import { firestore } from '../firebaseConfig';
 import { collection, getDocs } from 'firebase/firestore';
-import { StyleSheet } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 
 type TeamProps = {
-  id: string;           // normalized ID that matches what is used in the games
-  teamName: string;
-  icon: string;
-  division: string;
-  gamesPlayed: number;
-  wins: number;
-  losses: number;
-  ptsMinus: number;
-  ptsPlus: number;
-  ptsDifference: number;
-  standingPoints: number;
+  docID: string;
+  teamName?: string;
+  icon?: string;
+  division?: string;
+  gamesPlayed?: number;
+  wins?: number;
+  losses?: number;
+  ptsMinus?: number;
+  ptsPlus?: number;
+  ptsDifference?: number;
+  standingPoints?: number;
 };
 
 type GameProps = {
-  gameID: number;
-  homeTeam: string;   // normalized team ID
-  awayTeam: string;   // normalized team ID
-  finalPointsHome: number;
-  finalPointsAway: number;
-  winner: string;     // normalized team ID
-  loser: string;      // normalized team ID
+  gameID?: number;
+  homeTeam?: string;
+  awayTeam?: string;
+  finalPointsHome?: number;
+  finalPointsAway?: number;
+  winner?: string;
+  loser?: string;
 };
 
-// Function to normalize a team name doc ID to match the format used in the games
-// For example: "BC Radviliškis" -> "bcradviliskis"
-// We'll remove spaces, convert to lowercase, and remove diacritics.
-function normalizeID(input: string): string {
-  // Convert to lowercase
-  let normalized = input.toLowerCase();
-  // Remove accents/diacritics like š, į, etc.
-  // A simple replace for known diacritics:
-  normalized = normalized
-    .replace(/ą/g, 'a')
-    .replace(/č/g, 'c')
-    .replace(/ę/g, 'e')
-    .replace(/ė/g, 'e')
-    .replace(/į/g, 'i')
-    .replace(/š/g, 's')
-    .replace(/ų/g, 'u')
-    .replace(/ū/g, 'u')
-    .replace(/ž/g, 'z');
-  // Remove any non-alphanumeric characters except maybe keep them if needed
-  // We'll just remove spaces and punctuation:
-  normalized = normalized.replace(/\s+/g, ''); // remove spaces
-  return normalized;
+interface StandingsNavigationProp {
+  navigate: (
+    screen: string,
+    params?: {
+      teamName?: string;
+    }
+  ) => void;
 }
 
-function getPlaceTextColor(place: number, division: string) {
-  if (division === 'A') {
-    if (place >= 1 && place <= 4) return { color: 'green' };
-    if (place >= 5 && place <= 12) return { color: 'yellow' };
-    if (place === 13 || place === 14) return { color: 'black' };
-    if (place === 15 || place === 16) return { color: 'red' };
-  } else {
-    // B divisions
-    if (place >= 1 && place <= 8) return { color: 'green' };
-    if (place >= 9 && place <= 13) return { color: 'black' };
-  }
-  return {};
-}
-
-function sortTeams(divisionTeams: TeamProps[]) {
-  return divisionTeams.sort((a, b) => {
-    if (b.standingPoints !== a.standingPoints) return b.standingPoints - a.standingPoints;
-    if (b.ptsDifference !== a.ptsDifference) return b.ptsDifference - a.ptsDifference;
-    return a.teamName.localeCompare(b.teamName);
-  });
-}
-
-const StandingsScreen = () => {
+const StandingsScreen: React.FC = () => {
+  const navigation = useNavigation<StandingsNavigationProp>();
   const [teams, setTeams] = useState<TeamProps[]>([]);
   const [games, setGames] = useState<GameProps[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,21 +56,16 @@ const StandingsScreen = () => {
 
   const fetchData = useCallback(async () => {
     try {
-      console.log('Fetching data and recalculating stats for division:', selectedDivision);
       setLoading(true);
 
-      const teamsCollection = collection(firestore, 'teams');
-      const teamSnapshot = await getDocs(teamsCollection);
-      let teamsList: TeamProps[] = teamSnapshot.docs.map((doc) => {
-        const data = doc.data() as any;
-
-        const teamNormalizedID = normalizeID(doc.id);
-
+      const teamsSnapshot = await getDocs(collection(firestore, 'teams'));
+      const loadedTeams: TeamProps[] = teamsSnapshot.docs.map((doc) => {
+        const data = doc.data() || {};
         return {
-          id: teamNormalizedID,
-          teamName: data.teamName || doc.id, // Use doc.id as fallback if no teamName
-          icon: data.icon || '',
-          division: typeof data.division === 'string' ? data.division.trim() : '',
+          docID: doc.id,
+          teamName: data.teamName,
+          icon: data.icon,
+          division: data.division,
           gamesPlayed: 0,
           wins: 0,
           losses: 0,
@@ -107,79 +76,59 @@ const StandingsScreen = () => {
         };
       });
 
-      const gamesCollection = collection(firestore, 'games');
-      const gameSnapshot = await getDocs(gamesCollection);
-      const gamesList: GameProps[] = gameSnapshot.docs.map((doc) => {
-        const data = doc.data() as any;
+      const gamesSnapshot = await getDocs(collection(firestore, 'games'));
+      const loadedGames: GameProps[] = gamesSnapshot.docs.map((doc) => {
+        const data = doc.data() || {};
         return {
-          gameID: data.gameID || 0,
-          homeTeam: normalizeID(data.homeTeam || ''),
-          awayTeam: normalizeID(data.awayTeam || ''),
-          finalPointsHome: data.finalPointsHome || 0,
-          finalPointsAway: data.finalPointsAway || 0,
-          winner: normalizeID(data.winner || ''),
-          loser: normalizeID(data.loser || ''),
+          gameID: data.gameID,
+          homeTeam: data.homeTeam,
+          awayTeam: data.awayTeam,
+          finalPointsHome: data.finalPointsHome,
+          finalPointsAway: data.finalPointsAway,
+          winner: data.winner,
+          loser: data.loser,
         };
       });
 
       const teamMap = new Map<string, TeamProps>();
-      teamsList.forEach((team) => {
-        teamMap.set(team.id, team);
+      loadedTeams.forEach((t) => {
+        teamMap.set(t.docID, t);
       });
 
-      for (const game of gamesList) {
-        const {
-          homeTeam,
-          awayTeam,
-          finalPointsHome,
-          finalPointsAway,
-          winner,
-          loser,
-        } = game;
+      for (const g of loadedGames) {
+        if (!g.homeTeam || !g.awayTeam || !g.winner || !g.loser) continue;
 
-        const home = teamMap.get(homeTeam);
-        const away = teamMap.get(awayTeam);
+        const home = teamMap.get(g.homeTeam);
+        const away = teamMap.get(g.awayTeam);
+        const winT = teamMap.get(g.winner);
+        const loseT = teamMap.get(g.loser);
 
-        if (!home || !away) {
-          console.warn('Game references unknown team:', game);
-          continue;
+        if (home && away && g.finalPointsHome !== undefined && g.finalPointsAway !== undefined) {
+          home.ptsPlus = (home.ptsPlus ?? 0) + g.finalPointsHome;
+          home.ptsMinus = (home.ptsMinus ?? 0) + g.finalPointsAway;
+          away.ptsPlus = (away.ptsPlus ?? 0) + g.finalPointsAway;
+          away.ptsMinus = (away.ptsMinus ?? 0) + g.finalPointsHome;
         }
 
-        home.ptsPlus += finalPointsHome;
-        home.ptsMinus += finalPointsAway;
-        away.ptsPlus += finalPointsAway;
-        away.ptsMinus += finalPointsHome;
-
-        const winnerTeam = teamMap.get(winner);
-        const loserTeam = teamMap.get(loser);
-
-        if (winnerTeam) {
-          winnerTeam.wins += 1;
-          winnerTeam.standingPoints += 2; // winner gets +2 points
-        } else {
-          console.warn('No winner team found for game:', game);
+        if (winT) {
+          winT.wins = (winT.wins ?? 0) + 1;
+          winT.standingPoints = (winT.standingPoints ?? 0) + 2;
         }
-
-        if (loserTeam) {
-          loserTeam.losses += 1;
-          loserTeam.standingPoints += 1; // loser gets +1 point
-        } else {
-          console.warn('No loser team found for game:', game);
+        if (loseT) {
+          loseT.losses = (loseT.losses ?? 0) + 1;
+          loseT.standingPoints = (loseT.standingPoints ?? 0) + 1;
         }
       }
 
-      for (const t of teamsList) {
-        t.ptsDifference = t.ptsPlus - t.ptsMinus;
-        t.gamesPlayed = t.wins + t.losses;
-      }
+      teamMap.forEach((t) => {
+        t.ptsDifference = (t.ptsPlus ?? 0) - (t.ptsMinus ?? 0);
+        t.gamesPlayed = (t.wins ?? 0) + (t.losses ?? 0);
+      });
 
-      setTeams(teamsList);
-      setGames(gamesList);
-
-      console.log('Updated Teams after calculation:', teamsList);
-
-    } catch (error) {
-      console.error('Error fetching data:', error);
+      setTeams(Array.from(teamMap.values()));
+      setGames(loadedGames);
+    } catch (err) {
+      console.error('Error fetching data:', err);
     } finally {
       setLoading(false);
     }
@@ -193,39 +142,61 @@ const StandingsScreen = () => {
     setSelectedDivision(division);
   };
 
+  const sortTeams = (divisionTeams: TeamProps[]) => {
+    return [...divisionTeams].sort((a, b) => {
+      if ((b.standingPoints ?? 0) !== (a.standingPoints ?? 0)) {
+        return (b.standingPoints ?? 0) - (a.standingPoints ?? 0);
+      }
+      if ((b.ptsDifference ?? 0) !== (a.ptsDifference ?? 0)) {
+        return (b.ptsDifference ?? 0) - (a.ptsDifference ?? 0);
+      }
+      return (a.teamName ?? '').localeCompare(b.teamName ?? '');
+    });
+  };
+
+  const getPlaceTextColor = (place: number, division: string | undefined) => {
+    if (division === 'A') {
+      if (place >= 1 && place <= 4) return { color: 'green' };
+      if (place >= 5 && place <= 12) return { color: 'yellow' };
+      if (place === 13 || place === 14) return { color: 'black' };
+      if (place === 15 || place === 16) return { color: 'red' };
+    } else if (division?.startsWith('B')) {
+      if (place >= 1 && place <= 8) return { color: 'green' };
+      if (place >= 9 && place <= 13) return { color: 'black' };
+    }
+    return {};
+  };
+
   const renderStandings = () => {
     if (loading) {
       return (
-        <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
+        <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#0000ff" />
-          <Text style={{color: '#000', fontSize: 16, marginTop: 10}}>Loading teams...</Text>
+          <Text style={styles.loadingText}>Loading teams...</Text>
         </View>
       );
     }
 
-    const divisionTeams = teams.filter((team) => team.division === selectedDivision);
+    const divisionTeams = teams.filter((t) => t.division === selectedDivision);
     const rowsCount = selectedDivision === 'A' ? 16 : 13;
-    const sortedTeams = sortTeams(divisionTeams);
+    const sorted = sortTeams(divisionTeams);
     const tableRows = Array.from({ length: rowsCount }, (_, i) => {
-      const team = sortedTeams[i];
-      return { place: i + 1, team };
+      const t = sorted[i];
+      return { place: i + 1, team: t };
     });
 
-    console.log('Teams in Division:', selectedDivision, divisionTeams);
-    console.log('Sorted Teams in Division:', sortedTeams);
-
     return (
-      <View style={{flex: 1, paddingHorizontal: 10, paddingVertical: 10}}>
-        <View style={{flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#ddd', alignItems: 'center', paddingVertical: 5, backgroundColor: '#ccc'}}>
-          <View style={{marginHorizontal: 5}}><Text style={{fontSize: 14, fontWeight: 'bold'}}>#</Text></View>
-          <View style={{marginHorizontal: 5}}><Text style={{fontSize: 14, fontWeight: 'bold'}}>Team</Text></View>
-          <View style={{marginHorizontal: 5}}><Text style={{fontSize: 14, fontWeight: 'bold'}}>GP</Text></View>
-          <View style={{marginHorizontal: 5}}><Text style={{fontSize: 14, fontWeight: 'bold'}}>W</Text></View>
-          <View style={{marginHorizontal: 5}}><Text style={{fontSize: 14, fontWeight: 'bold'}}>L</Text></View>
-          <View style={{marginHorizontal: 5}}><Text style={{fontSize: 14, fontWeight: 'bold'}}>Pts-</Text></View>
-          <View style={{marginHorizontal: 5}}><Text style={{fontSize: 14, fontWeight: 'bold'}}>Pts+</Text></View>
-          <View style={{marginHorizontal: 5}}><Text style={{fontSize: 14, fontWeight: 'bold'}}>Diff</Text></View>
-          <View style={{marginHorizontal: 5}}><Text style={{fontSize: 14, fontWeight: 'bold'}}>P</Text></View>
+      <View style={styles.tableContainer}>
+        <View style={[styles.tableRow, styles.tableHeader]}>
+          <Text style={[styles.headerCell, { flex: 0.5, textAlign: 'left' }]}>#</Text>
+          <Text style={[styles.headerCell, { flex: 2, textAlign: 'left' }]}>Team</Text>
+          <Text style={[styles.headerCell, { flex: 0.6, textAlign: 'right' }]}>GP</Text>
+          <Text style={[styles.headerCell, { flex: 0.6, textAlign: 'right' }]}>W</Text>
+          <Text style={[styles.headerCell, { flex: 0.6, textAlign: 'right' }]}>L</Text>
+          <Text style={[styles.headerCell, { flex: 0.8, textAlign: 'right' }]}>Pts-</Text>
+          <Text style={[styles.headerCell, { flex: 0.8, textAlign: 'right' }]}>Pts+</Text>
+          <Text style={[styles.headerCell, { flex: 0.8, textAlign: 'right' }]}>Diff</Text>
+          <Text style={[styles.headerCell, { flex: 0.6, textAlign: 'right' }]}>P</Text>
         </View>
 
         <FlatList
@@ -236,37 +207,63 @@ const StandingsScreen = () => {
             if (!team) {
               return (
                 <View style={styles.tableRow}>
-                  <View style={styles.cell}><Text style={styles.cellText}>{place}</Text></View>
-                  <Text style={styles.cellText}>No Team</Text>
+                  <Text style={[styles.cellText, { flex: 0.5 }]}> {place}</Text>
+                  <Text style={[styles.cellText, { flex: 2 }]}>No Team</Text>
                 </View>
               );
             }
-          
-            const placeColor = getPlaceTextColor(place, team.division);
-          
+            const colorStyle = getPlaceTextColor(place, team.division);
             return (
-              <View style={styles.tableRow}>
-                <View style={styles.cell}><Text style={[styles.cellText, placeColor]}>{place}</Text></View>
-                <View style={[styles.teamCell, { flex: 2 }]}>
+              <Pressable
+                style={styles.tableRow}
+                onPress={() => {
+                  // Pass the docID as "teamName"
+                  navigation.navigate('TeamScreen', {
+                    teamName: team.docID,
+                  });
+                }}
+              >
+                <Text style={[styles.cellText, { flex: 0.5 }, colorStyle]}>{place}</Text>
+
+                {/* Team name & icon */}
+                <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center' }}>
                   {team.icon ? (
                     <Image source={{ uri: team.icon }} style={styles.teamIcon} />
                   ) : (
                     <View style={styles.placeholderIcon} />
                   )}
-                  <Text style={styles.teamName} numberOfLines={2}>
-                    {team.teamName}
+                  <Text
+                    style={[styles.cellText, styles.teamName]}
+                    numberOfLines={1}
+                  >
+                    {team.teamName ?? 'Unnamed'}
                   </Text>
                 </View>
-                <View style={styles.cell}><Text style={styles.cellText}>{team.gamesPlayed}</Text></View>
-                <View style={styles.cell}><Text style={styles.cellText}>{team.wins}</Text></View>
-                <View style={styles.cell}><Text style={styles.cellText}>{team.losses}</Text></View>
-                <View style={styles.cell}><Text style={styles.cellText}>{team.ptsMinus}</Text></View>
-                <View style={styles.cell}><Text style={styles.cellText}>{team.ptsPlus}</Text></View>
-                <View style={styles.cell}><Text style={styles.cellText}>{team.ptsDifference}</Text></View>
-                <View style={styles.cell}><Text style={styles.cellText}>{team.standingPoints}</Text></View>
-              </View>
-            );
 
+                {/* Right-aligned numeric fields */}
+                <Text style={[styles.cellText, styles.numCell, { flex: 0.6 }]}>
+                  {team.gamesPlayed ?? 0}
+                </Text>
+                <Text style={[styles.cellText, styles.numCell, { flex: 0.6 }]}>
+                  {team.wins ?? 0}
+                </Text>
+                <Text style={[styles.cellText, styles.numCell, { flex: 0.6 }]}>
+                  {team.losses ?? 0}
+                </Text>
+                <Text style={[styles.cellText, styles.numCell, { flex: 0.8 }]}>
+                  {team.ptsMinus ?? 0}
+                </Text>
+                <Text style={[styles.cellText, styles.numCell, { flex: 0.8 }]}>
+                  {team.ptsPlus ?? 0}
+                </Text>
+                <Text style={[styles.cellText, styles.numCell, { flex: 0.8 }]}>
+                  {team.ptsDifference ?? 0}
+                </Text>
+                <Text style={[styles.cellText, styles.numCell, { flex: 0.6 }]}>
+                  {team.standingPoints ?? 0}
+                </Text>
+              </Pressable>
+            );
           }}
         />
       </View>
@@ -274,31 +271,43 @@ const StandingsScreen = () => {
   };
 
   return (
-    <SafeAreaView style={{flex:1, backgroundColor:'#fff'}}>
-      <View style={{flexDirection:'row', justifyContent:'space-around', paddingVertical:10, backgroundColor:'#000'}}>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.buttonContainer}>
         <Pressable
-          style={{padding:10, backgroundColor: selectedDivision==='A' ? '#0000ff':'#ccc', borderRadius:5}}
+          style={[
+            styles.divisionButton,
+            selectedDivision === 'A' && styles.divisionButtonSelected,
+          ]}
           onPress={() => handleDivisionChange('A')}
         >
-          <Text style={{color:'#000', fontWeight:'bold'}}>A Division</Text>
+          <Text style={styles.buttonText}>A Division</Text>
         </Pressable>
         <Pressable
-          style={{padding:10, backgroundColor: selectedDivision==='B-A' ? '#0000ff':'#ccc', borderRadius:5}}
+          style={[
+            styles.divisionButton,
+            selectedDivision === 'B-A' && styles.divisionButtonSelected,
+          ]}
           onPress={() => handleDivisionChange('B-A')}
         >
-          <Text style={{color:'#000', fontWeight:'bold'}}>B Division-A</Text>
+          <Text style={styles.buttonText}>B Division-A</Text>
         </Pressable>
         <Pressable
-          style={{padding:10, backgroundColor: selectedDivision==='B-B' ? '#0000ff':'#ccc', borderRadius:5}}
+          style={[
+            styles.divisionButton,
+            selectedDivision === 'B-B' && styles.divisionButtonSelected,
+          ]}
           onPress={() => handleDivisionChange('B-B')}
         >
-          <Text style={{color:'#000', fontWeight:'bold'}}>B Division-B</Text>
+          <Text style={styles.buttonText}>B Division-B</Text>
         </Pressable>
       </View>
+
       {renderStandings()}
     </SafeAreaView>
   );
 };
+
+export default StandingsScreen;
 
 const styles = StyleSheet.create({
   safeArea: {
@@ -322,73 +331,57 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#000',
     fontWeight: 'bold',
-    fontSize: 14,
   },
   loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
+    marginTop: 50,
     alignItems: 'center',
   },
   loadingText: {
-    color: '#000',
-    fontSize: 16,
     marginTop: 10,
+    fontSize: 16,
   },
   tableContainer: {
     flex: 1,
     paddingHorizontal: 10,
     paddingVertical: 10,
   },
+  tableHeader: {
+    backgroundColor: '#ccc',
+  },
   tableRow: {
     flexDirection: 'row',
     borderBottomWidth: 1,
     borderBottomColor: '#ddd',
     alignItems: 'center',
-    paddingVertical: 5,
-  },
-  tableHeader: {
-    backgroundColor: '#ccc',
+    paddingVertical: 4,
   },
   headerCell: {
-    marginHorizontal: 5,
-    alignSelf: 'flex-start',
-  },
-  tableHeaderText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: 'bold',
     color: '#000',
   },
-  cell: {
-    alignSelf: 'flex-start',
-    marginHorizontal: 5,
-    justifyContent: 'center',
-  },
   cellText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#000',
-    textAlign: 'left',
   },
   teamIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    marginRight: 4,
   },
   placeholderIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: '#ccc',
-  },
-  teamCell: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 5,
+    marginRight: 4,
   },
   teamName: {
-    fontSize: 14,
-    color: '#000',
-    marginLeft: 5,
+    fontWeight: '600',
+    flexShrink: 1,
+  },
+  numCell: {
+    textAlign: 'right',
   },
 });
-
-export default StandingsScreen;

@@ -6,3 +6,5 @@ export type RootStackParamList = {
       imageURL: string;
     };
   };
+
+  export default RootStackParamList;

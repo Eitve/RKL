@@ -1,119 +1,150 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Image, FlatList, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  Image,
+  StyleSheet,
+  Pressable,
+  FlatList,
+} from 'react-native';
 import { firestore } from '../app/firebaseConfig';
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
-import Player from './player';
+import { useNavigation } from '@react-navigation/native';
 
 interface Team {
-  teamName: string;
-  teamManager: string;
-  achievements: string[];
-  assistantCoach: string;
-  headCoach: string;
-  icon: string;
-  teamPhoto: string;
-  nameChanges: string[];
+  teamName?: string;
+  icon?: string;
+  teamPhoto?: string;
+  headCoach?: string;
+  assistantCoach?: string;
+  teamManager?: string;
 }
 
 interface PlayerData {
   id: string;
-  firstName: string;
-  lastName: string;
-  photoURL: string;
-  age: number;
-  dob: string;
-  position: string;
-  s2PAPG: number;
-  s2PMPG: number;
-  s2pPercent: number;
-  s3PAPG: number;
-  s3PMPG: number;
-  s3pPercent: number;
-  sAPG: number;
-  sBLKPG: number;
-  sEFF: number;
-  sFOPG: number;
-  sFTPercent: number;
-  sFTAPG: number;
-  sFTMPG: number;
-  sGP: number;
-  sMPG: number;
-  sPFPG: number;
-  sPPG: number;
-  sRPG: number;
-  sSTPG: number;
-  sTOPG: number;
-  shirtNumber: number;
-  weight: number;
+  firstName?: string;
+  lastName?: string;
+  photoURL?: string;
+}
+
+interface TeamScreenNav {
+  navigate: (
+    screenName: 'PlayerScreen',
+    params: { teamID: string; playerID: string } // Define required navigation parameters
+  ) => void;
 }
 
 const Team: React.FC<{ teamName: string }> = ({ teamName }) => {
+  const navigation = useNavigation<TeamScreenNav>();
   const [teamData, setTeamData] = useState<Team | null>(null);
   const [players, setPlayers] = useState<PlayerData[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchTeamData = async () => {
       try {
+        setLoading(true);
 
         const teamDocRef = doc(firestore, 'teams', teamName);
         const teamDoc = await getDoc(teamDocRef);
 
         if (teamDoc.exists()) {
           setTeamData(teamDoc.data() as Team);
+        } else {
+          setTeamData({});
         }
 
-        const playersCollectionRef = collection(firestore, `teams/${teamName}/players`);
-        const playersSnapshot = await getDocs(playersCollectionRef);
+        const playersColl = collection(firestore, `teams/${teamName}/players`);
+        const playersSnap = await getDocs(playersColl);
+        const loadedPlayers: PlayerData[] = playersSnap.docs.map((p) => {
+          const playerData = p.data() as PlayerData;
+          return {
+            ...playerData,
+            id: p.id,
+          };
+        });
 
-        const playersData = playersSnapshot.docs.map((doc) => ({
-          ...(doc.data() as PlayerData),
-          id: doc.id,
-        }));
-
-        setPlayers(playersData);
-      } catch (error) {
-        console.error("Error fetching team data:", error);
+        setPlayers(loadedPlayers);
+      } catch (err) {
+        console.error('Error fetching team data:', err);
+        setTeamData({});
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchTeamData();
   }, [teamName]);
 
-  if (!teamData) {
+  if (loading) {
     return <Text>Loading...</Text>;
   }
 
+  if (!teamData) {
+    return <Text>No team data found.</Text>;
+  }
+
+  const renderPlayer = ({ item }: { item: PlayerData }) => (
+    <Pressable
+      key={item.id}
+      onPress={() =>
+        navigation.navigate('PlayerScreen', {
+          teamID: teamName, // Pass teamName as teamID
+          playerID: item.id, // Pass the player's document ID
+        })
+      }
+      style={styles.playerRow}
+    >
+      {item.photoURL ? (
+        <Image source={{ uri: item.photoURL }} style={styles.playerImage} />
+      ) : (
+        <View style={[styles.playerImage, { backgroundColor: '#ccc' }]} />
+      )}
+      <Text style={styles.playerName}>
+        {item.firstName ?? 'Unknown'} {item.lastName ?? ''}
+      </Text>
+    </Pressable>
+  );
+
   return (
     <View style={styles.container}>
-      <Image source={{ uri: teamData.teamPhoto }} style={styles.teamPhoto} />
-      <Text style={styles.teamName}><Image source={{ uri: teamData.icon }} style={styles.icon} /> {teamData.teamName}</Text>
-      <Text>Head Coach: {teamData.headCoach}</Text>
-      <Text>Assistant Coach: {teamData.assistantCoach}</Text>
-      <Text>Manager: {teamData.teamManager}</Text>
-      
-      <Text style={styles.subheading}>Achievements:</Text>
-      {teamData.achievements.map((achievement, index) => (
-        <Text key={index} style={styles.achievement}>- {achievement}</Text>
-      ))}
-      
-      <Text style={styles.subheading}>Name Changes:</Text>
-      {teamData.nameChanges.map((nameChange, index) => (
-        <Text key={index} style={styles.nameChange}>- {nameChange}</Text>
-      ))}
+      {teamData.teamPhoto && (
+        <Image source={{ uri: teamData.teamPhoto }} style={styles.teamPhoto} />
+      )}
+
+      {teamData.teamName && (
+        <Text style={styles.teamName}>
+          {teamData.icon && (
+            <Image source={{ uri: teamData.icon }} style={styles.icon} />
+          )}{' '}
+          {teamData.teamName}
+        </Text>
+      )}
+
+      {teamData.headCoach && <Text>Head Coach: {teamData.headCoach}</Text>}
+      {teamData.assistantCoach && <Text>Assistant Coach: {teamData.assistantCoach}</Text>}
+      {teamData.teamManager && <Text>Manager: {teamData.teamManager}</Text>}
 
       <Text style={styles.subheading}>Players:</Text>
+
       <FlatList
         data={players}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <Player playerData={item} />}
+        renderItem={renderPlayer}
+        nestedScrollEnabled
+        contentContainerStyle={{ paddingBottom: 20 }}
       />
     </View>
   );
 };
 
+export default Team;
+
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
     padding: 20,
+    backgroundColor: '#fff',
   },
   teamPhoto: {
     width: '100%',
@@ -122,30 +153,34 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   icon: {
-    width: 80,
-    height: 80,
+    width: 60,
+    height: 60,
     borderRadius: 10,
-    marginBottom: 10,
   },
   teamName: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 10,
-    marginTop: -10,
+    marginTop: 8,
   },
   subheading: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginTop: 10,
+    marginTop: 20,
+    marginBottom: 10,
   },
-  achievement: {
-    fontSize: 16,
-    marginLeft: 10,
+  playerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  nameChange: {
+  playerImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 10,
+  },
+  playerName: {
     fontSize: 16,
-    marginLeft: 10,
   },
 });
-
-export default Team;

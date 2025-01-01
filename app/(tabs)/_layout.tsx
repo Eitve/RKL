@@ -8,32 +8,41 @@ import StandingsScreen from './standings';
 import ScheduleScreen from './schedule';
 import GameDetailsScreen from './GameDetailScreen';
 import StatisticsScreen from './statistics';
-
+import TeamScreen from './TeamScreen';
+import PlayerScreen from './PlayerScreen';
 import { ThemeProvider, createTheme } from '@rneui/themed';
+
+export type RootStackParamList = {
+  Index: undefined;
+  NewsDetail: { title: string; content: string; imageURL: string };
+};
 
 export type ScheduleStackParamList = {
   ScheduleMain: undefined;
   GameDetails: { gameID: number };
 };
 
+export type StandingsStackParamList = {
+  StandingsMain: undefined;
+  TeamScreen: { teamName: string };
+  PlayerScreen: { playerID: string };
+};
+
 const Tab = createBottomTabNavigator();
-const HomeStack = createNativeStackNavigator();
+const HomeStack = createNativeStackNavigator<RootStackParamList>();
 const ScheduleStack = createNativeStackNavigator<ScheduleStackParamList>();
+const StandingsStack = createNativeStackNavigator<StandingsStackParamList>();
 
 const theme = createTheme({
-  lightColors: {
-    primary: '#6200ea',
-  },
-  darkColors: {
-    primary: '#bb86fc',
-  },
+  lightColors: { primary: '#6200ea' },
+  darkColors: { primary: '#bb86fc' },
 });
 
 function HomeStackScreen() {
   return (
     <HomeStack.Navigator>
       <HomeStack.Screen
-        name="Home"
+        name="Index"
         component={HomeScreen}
         options={{ headerShown: false }}
       />
@@ -63,6 +72,28 @@ function ScheduleStackScreen() {
   );
 }
 
+function StandingsStackScreen() {
+  return (
+    <StandingsStack.Navigator>
+      <StandingsStack.Screen
+        name="StandingsMain"
+        component={StandingsScreen}
+        options={{ headerShown: false }}
+      />
+      <StandingsStack.Screen
+        name="TeamScreen"
+        component={TeamScreen}
+        options={{ headerShown: false }}
+      />
+      <StandingsStack.Screen
+        name="PlayerScreen"
+        component={PlayerScreen}
+        options={{ headerShown: false }}
+      />
+    </StandingsStack.Navigator>
+  );
+}
+
 export default function AppTabs() {
   return (
     <NavigationContainer>
@@ -73,19 +104,16 @@ export default function AppTabs() {
             component={ScheduleStackScreen}
             options={{ headerShown: false, title: 'Schedule' }}
           />
-
           <Tab.Screen
-            name="Standings"
-            component={StandingsScreen}
-            options={{ headerShown: false }}
+            name="StandingsStack"
+            component={StandingsStackScreen}
+            options={{ headerShown: false, title: 'Standings' }}
           />
-
           <Tab.Screen
             name="Home"
             component={HomeStackScreen}
-            options={{ headerShown: false }}
+            options={{ headerShown: false, title: 'Home' }}
           />
-
           <Tab.Screen
             name="Statistics"
             component={StatisticsScreen}

@@ -18,27 +18,10 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 
-function parseMinutesString(str: string): number {
-  const trimmed = str.trim();
-  if (!trimmed) return 0;
-  const parts = trimmed.split(':');
-  if (parts.length === 2) {
-    const mm = parseInt(parts[0], 10) || 0;
-    const ss = parseInt(parts[1], 10) || 0;
-    const result = mm + ss / 60;
-    console.log(`parseMinutesString -> raw="${str}", mm=${mm}, ss=${ss}, float=${result}`);
-    return result;
-  }
-  const fallback = parseFloat(trimmed);
-  const finalVal = isNaN(fallback) ? 0 : fallback;
-  console.log(`parseMinutesString -> fallback for "${str}", float=${finalVal}`);
-  return finalVal;
-}
-
-function toMMSS(numMins: number): string {
-  const mm = Math.floor(numMins);
-  const secFloat = (numMins - mm) * 60;
-  const ss = Math.round(secFloat);
+// Utility function to format seconds to MM:SS
+function toMMSS(totalSecs: number): string {
+  const mm = Math.floor(totalSecs / 60);
+  const ss = totalSecs % 60;
   const mmStr = mm.toString();
   const ssStr = ss < 10 ? `0${ss}` : `${ss}`;
   return `${mmStr}:${ssStr}`;
@@ -66,7 +49,7 @@ type PlayerAggregatedStats = {
   pf: number;
   plusMinus: number;
   pts: number;
-  mins: number;
+  secs: number; // Total seconds played
   eff: number;
   gamesPlayed: number;
 };
@@ -88,7 +71,7 @@ type BoxScoreDoc = {
   PF?: number;
   PLUSMINUS?: number;
   PTS?: number;
-  MINS?: string;
+  SECS?: number; // Seconds played in a game
   EFF?: number;
 };
 
@@ -97,15 +80,14 @@ const StatsLeadersScreen = () => {
   const [loading, setLoading] = useState(true);
 
   const [positionFilter, setPositionFilter] = useState<'ALL' | 'PG' | 'SG' | 'SF' | 'PF' | 'C'>('ALL');
-  const [statFilter, setStatFilter] = useState<
-    'PTS' | 'REB' | 'AST' | 'STL' | 'BLK' | 'FG%' | '2PT%' | '3PT%' | 'FT%' | 'EFF'
-  >('PTS');
+  const [statFilter, setStatFilter] = useState<'PTS' | 'REB' | 'AST' | 'STL' | 'BLK' | 'FG%' | '2PT%' | '3PT%' | 'FT%' | 'EFF'>('PTS');
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
 
+        // 1) Gather Teams and initialize aggregator
         const teamsSnap = await getDocs(collection(firestore, 'teams'));
         const aggregator: Record<string, PlayerAggregatedStats> = {};
 
@@ -113,9 +95,11 @@ const StatsLeadersScreen = () => {
           const tData = tDoc.data() || {};
           const teamName = (tData.teamName as string) || 'Unknown Team';
           const pSnap = await getDocs(collection(tDoc.ref, 'players'));
+
           for (const pDoc of pSnap.docs) {
             const pData = pDoc.data() as DocumentData;
             const uniqueID = `${tDoc.id}-${pDoc.id}`;
+
             aggregator[uniqueID] = {
               id: uniqueID,
               firstName: (pData.firstName as string) || 'N/A',
@@ -138,13 +122,14 @@ const StatsLeadersScreen = () => {
               pf: 0,
               plusMinus: 0,
               pts: 0,
-              mins: 0,
+              secs: 0, // Initialize total seconds to 0
               eff: 0,
               gamesPlayed: 0,
             };
           }
         }
 
+        // 2) Gather all games and their boxscores
         const gSnap = await getDocs(collection(firestore, 'games'));
         for (const gDoc of gSnap.docs) {
           const gRef = doc(firestore, 'games', gDoc.id);
@@ -154,11 +139,11 @@ const StatsLeadersScreen = () => {
           const processBox = (boxSnap: QuerySnapshot) => {
             boxSnap.forEach((bx) => {
               const bData = bx.data() as BoxScoreDoc;
-              console.log(`Found box doc: name=${bData.name}, mins=${bData.MINS || 'N/A'}`);
               if (!bData.name) return;
-              const lowerName = bData.name.trim().toLowerCase();
 
+              const lowerName = bData.name.trim().toLowerCase();
               let matchedKey: string | null = null;
+
               for (const [k, agg] of Object.entries(aggregator)) {
                 const fullN = (agg.firstName + ' ' + agg.lastName).toLowerCase().trim();
                 if (fullN === lowerName) {
@@ -187,11 +172,7 @@ const StatsLeadersScreen = () => {
               agg.pts += bData.PTS || 0;
               agg.eff += bData.EFF || 0;
 
-              if (bData.MINS && typeof bData.MINS === 'string') {
-                const parsedMins = parseMinutesString(bData.MINS);
-                console.log(`Parsed: ${bData.MINS} -> ${parsedMins}`);
-                agg.mins += parsedMins;
-              }
+              agg.secs += bData.SECS || 0;
 
               agg.gamesPlayed += 1;
             });
@@ -215,20 +196,22 @@ const StatsLeadersScreen = () => {
           const avgBLK = st.blk / gp;
           const totalMade = st.twoPM + st.threePM;
           const totalAtt = st.twoPA + st.threePA;
+
           let fgPct = 0;
           if (totalAtt > 0) fgPct = (totalMade / totalAtt) * 100;
+
           let twoPtPct = 0;
           if (st.twoPA > 0) twoPtPct = (st.twoPM / st.twoPA) * 100;
+
           let threePtPct = 0;
           if (st.threePA > 0) threePtPct = (st.threePM / st.threePA) * 100;
+
           let ftPct = 0;
           if (st.FTA > 0) ftPct = (st.FTM / st.FTA) * 100;
-          const avgEFF = st.eff / gp;
-          const avgMins = st.mins / gp;
 
-          console.log(
-            `Updating doc for ${key}: gp=${gp}, totalMins=${st.mins}, avgMins=${avgMins}`
-          );
+          const avgEFF = st.eff / gp;
+
+          const avgSecs = st.secs / gp;
 
           try {
             await updateDoc(doc(firestore, 'teams', teamID, 'players', playerID), {
@@ -243,7 +226,8 @@ const StatsLeadersScreen = () => {
               threePtPct,
               ftPct,
               avgEFF,
-              avgMins,
+              secs: st.secs,
+              avgSecs,
               avgTOV: st.tov / gp,
               avgPF: st.pf / gp,
               avgPlusMinus: st.plusMinus / gp,
@@ -264,7 +248,15 @@ const StatsLeadersScreen = () => {
     fetchData();
   }, []);
 
-  // Filter & sort logic
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" />
+        <Text>Loading stats...</Text>
+      </View>
+    );
+  }
+
   const getFilteredSortedPlayers = () => {
     let playersArr = Object.values(playersMap);
     if (positionFilter !== 'ALL') {
@@ -298,15 +290,6 @@ const StatsLeadersScreen = () => {
     return playersArr;
   };
 
-  if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" />
-        <Text>Loading stats...</Text>
-      </View>
-    );
-  }
-
   const leaders = getFilteredSortedPlayers();
 
   const renderLeader = ({ item }: { item: PlayerAggregatedStats }) => {
@@ -334,8 +317,8 @@ const StatsLeadersScreen = () => {
       ? `${val.toFixed(1)}%`
       : val.toFixed(1);
 
-    const avgMins = item.mins / gp;
-    const mmss = toMMSS(avgMins);
+    // Convert average secs to mm:ss
+    const mmss = toMMSS(Math.round(item.secs / gp));
 
     return (
       <View style={styles.playerRow}>
