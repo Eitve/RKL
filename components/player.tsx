@@ -1,6 +1,21 @@
 import React from 'react';
-import { View, Text, Pressable, Image, StyleSheet, FlatList } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { View, Text, Pressable, Image, StyleSheet, FlatList, } from 'react-native';
+import { NavigationProp, useNavigation } from '@react-navigation/native';
+
+const toMMSS = (totalSecs: number): string => {
+  const mm = Math.floor(totalSecs / 60);
+  const ss = totalSecs % 60;
+  const mmStr = mm.toString();
+  const ssStr = ss < 10 ? `0${ss}` : `${ss}`;
+  return `${mmStr}:${ssStr}`;
+};
+
+type StandingsStackParamList = {
+  PlayerScreen: {
+    teamID: string;
+    playerID: string;
+  };
+};
 
 interface PlayerProps {
   teamID: string;
@@ -11,16 +26,22 @@ interface PlayerProps {
     photoURL?: string;
     shirtNumber?: number;
     position?: string;
+    avgSecs?: number;
   }[];
 }
 
+type PlayerScreenNavigationProp = NavigationProp<
+  StandingsStackParamList,
+  'PlayerScreen'
+>;
+
 const Player: React.FC<PlayerProps> = ({ teamID, players }) => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<PlayerScreenNavigationProp>();
 
   const navigateToPlayerScreen = (playerID: string) => {
     navigation.navigate('PlayerScreen', {
       teamID,
-      playerID, // Pass both `teamID` and `playerID`
+      playerID,
     });
   };
 
@@ -38,8 +59,13 @@ const Player: React.FC<PlayerProps> = ({ teamID, players }) => {
         <Text style={styles.playerName}>
           {item.firstName} {item.lastName}
         </Text>
-        {item.position && <Text style={styles.playerPosition}>Position: {item.position}</Text>}
+        {item.position && (
+          <Text style={styles.playerPosition}>Position: {item.position}</Text>
+        )}
         {item.shirtNumber && <Text>Shirt #: {item.shirtNumber}</Text>}
+        {item.avgSecs !== undefined && (
+          <Text>Avg Minutes/Game: {toMMSS(item.avgSecs)}</Text>
+        )}
       </View>
     </Pressable>
   );
