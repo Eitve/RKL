@@ -29,8 +29,8 @@ interface PlayerData {
 
 interface TeamScreenNav {
   navigate: (
-    screenName: string,
-    params?: { playerID?: string }
+    screenName: 'PlayerScreen',
+    params: { teamID: string; playerID: string } // Define required navigation parameters
   ) => void;
 }
 
@@ -87,7 +87,12 @@ const Team: React.FC<{ teamName: string }> = ({ teamName }) => {
   const renderPlayer = ({ item }: { item: PlayerData }) => (
     <Pressable
       key={item.id}
-      onPress={() => navigation.navigate('PlayerScreen', { playerID: item.id })}
+      onPress={() =>
+        navigation.navigate('PlayerScreen', {
+          teamID: teamName, // Pass teamName as teamID
+          playerID: item.id, // Pass the player's document ID
+        })
+      }
       style={styles.playerRow}
     >
       {item.photoURL ? (

@@ -1,207 +1,91 @@
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  Image,
-  StyleSheet,
-  ScrollView,
-  FlatList,
-} from 'react-native';
-import { useRoute, RouteProp } from '@react-navigation/native';
-import { firestore } from '../app/firebaseConfig';
-import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
+import React from 'react';
+import { View, Text, Pressable, Image, StyleSheet, FlatList } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 
-type StandingsStackParamList = {
-  PlayerScreen: { playerID: string };
-  // ...
-};
-type PlayerScreenRouteProp = RouteProp<StandingsStackParamList, 'PlayerScreen'>;
-
-interface PlayerDoc {
-  firstName?: string;
-  lastName?: string;
-  dob?: string;
-  age?: number;
-  nationality?: string;
-  height?: number;
-  weight?: number;
-  photoURL?: string;
+interface PlayerProps {
+  teamID: string;
+  players: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    photoURL?: string;
+    shirtNumber?: number;
+    position?: string;
+  }[];
 }
 
-interface GameStats {
-  gameID?: string;
-  points?: number;
-  rebounds?: number;
-  assists?: number;
-  blocks?: number;
-  steals?: number;
-  minutes?: string;
-  [key: string]: any;
-}
+const Player: React.FC<PlayerProps> = ({ teamID, players }) => {
+  const navigation = useNavigation();
 
-const PlayerScreen: React.FC = () => {
-  const route = useRoute<PlayerScreenRouteProp>();
-  const { playerID } = route.params;
+  const navigateToPlayerScreen = (playerID: string) => {
+    navigation.navigate('PlayerScreen', {
+      teamID,
+      playerID, // Pass both `teamID` and `playerID`
+    });
+  };
 
-  const [player, setPlayer] = useState<PlayerDoc | null>(null);
-  const [gameStats, setGameStats] = useState<GameStats[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchPlayerData = async () => {
-      try {
-        setLoading(true);
-        const playerRef = doc(firestore, 'players', playerID);
-        const snap = await getDoc(playerRef);
-        if (snap.exists()) {
-          setPlayer(snap.data() as PlayerDoc);
-        } else {
-          setPlayer({});
-        }
-
-        const subSnap = await getDocs(collection(playerRef, 'games'));
-        const lines: GameStats[] = subSnap.docs.map((d) => {
-          const data = d.data() || {};
-          return {
-            gameID: d.id,
-            points: data.points,
-            rebounds: data.rebounds,
-            assists: data.assists,
-            blocks: data.blocks,
-            steals: data.steals,
-            minutes: data.minutes,
-          };
-        });
-        setGameStats(lines);
-      } catch (err) {
-        console.error('Error fetching player data:', err);
-        setPlayer({});
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPlayerData();
-  }, [playerID]);
-
-  if (loading) {
-    return (
-      <View style={styles.centered}>
-        <Text>Loading Player Data...</Text>
+  const renderPlayer = ({ item }: { item: typeof players[0] }) => (
+    <Pressable
+      style={styles.playerRow}
+      onPress={() => navigateToPlayerScreen(item.id)}
+    >
+      {item.photoURL ? (
+        <Image source={{ uri: item.photoURL }} style={styles.playerImage} />
+      ) : (
+        <View style={[styles.playerImage, { backgroundColor: '#ccc' }]} />
+      )}
+      <View style={styles.playerInfo}>
+        <Text style={styles.playerName}>
+          {item.firstName} {item.lastName}
+        </Text>
+        {item.position && <Text style={styles.playerPosition}>Position: {item.position}</Text>}
+        {item.shirtNumber && <Text>Shirt #: {item.shirtNumber}</Text>}
       </View>
-    );
-  }
-
-  if (!player) {
-    return (
-      <View style={styles.centered}>
-        <Text>No player data found.</Text>
-      </View>
-    );
-  }
+    </Pressable>
+  );
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.topSection}>
-        {player.photoURL ? (
-          <Image
-            source={{ uri: player.photoURL }}
-            style={styles.playerPhoto}
-          />
-        ) : (
-          <View style={[styles.playerPhoto, { backgroundColor: '#ccc' }]} />
-        )}
-
-        <View style={styles.bioContainer}>
-          <Text style={styles.playerName}>
-            {player.firstName} {player.lastName}
-          </Text>
-          {player.dob && <Text>DOB: {player.dob}</Text>}
-          {player.age !== undefined && <Text>Age: {player.age}</Text>}
-          {player.nationality && <Text>Nationality: {player.nationality}</Text>}
-          {player.height !== undefined && <Text>Height: {player.height} cm</Text>}
-          {player.weight !== undefined && <Text>Weight: {player.weight} kg</Text>}
-        </View>
-      </View>
-
-      <View style={styles.overallStatsSection}>
-        <Text style={styles.sectionTitle}>Overall Stats</Text>
-        <View style={styles.statsRow}>
-          <Text>Total Games: {gameStats.length}</Text>
-        </View>
-      </View>
-
-      <Text style={styles.sectionTitle}>Game by Game Stats</Text>
+    <View style={styles.container}>
       <FlatList
-        data={gameStats}
-        keyExtractor={(item) => item.gameID || Math.random().toString()}
-        style={{ marginTop: 8 }}
-        renderItem={({ item }) => (
-          <View style={styles.gameRow}>
-            <Text style={[styles.gameCell, { flex: 1 }]}>GameID: {item.gameID}</Text>
-            <Text style={[styles.gameCell, { flex: 0.6 }]}>Pts: {item.points ?? 0}</Text>
-            <Text style={[styles.gameCell, { flex: 0.6 }]}>Reb: {item.rebounds ?? 0}</Text>
-            <Text style={[styles.gameCell, { flex: 0.6 }]}>Ast: {item.assists ?? 0}</Text>
-            <Text style={[styles.gameCell, { flex: 0.6 }]}>Stl: {item.steals ?? 0}</Text>
-            <Text style={[styles.gameCell, { flex: 0.6 }]}>Blk: {item.blocks ?? 0}</Text>
-            <Text style={[styles.gameCell, { flex: 0.8 }]}>Min: {item.minutes ?? '00:00'}</Text>
-          </View>
-        )}
+        data={players}
+        keyExtractor={(item) => item.id}
+        renderItem={renderPlayer}
+        contentContainerStyle={{ paddingBottom: 20 }}
       />
-    </ScrollView>
+    </View>
   );
 };
 
-export default PlayerScreen;
+export default Player;
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    padding: 16,
     backgroundColor: '#fff',
   },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  topSection: {
+  playerRow: {
     flexDirection: 'row',
-    padding: 16,
+    alignItems: 'center',
+    padding: 12,
+    marginBottom: 8,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
   },
-  playerPhoto: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+  playerImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginRight: 12,
   },
-  bioContainer: {
-    marginLeft: 16,
+  playerInfo: {
     flex: 1,
   },
   playerName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 6,
-  },
-  overallStatsSection: {
-    paddingHorizontal: 16,
-    marginTop: 12,
-  },
-  sectionTitle: {
-    fontWeight: 'bold',
     fontSize: 16,
+    fontWeight: 'bold',
   },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-  },
-  gameRow: {
-    flexDirection: 'row',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
-  },
-  gameCell: {
-    textAlign: 'center',
+  playerPosition: {
+    color: '#555',
   },
 });
