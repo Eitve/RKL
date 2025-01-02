@@ -10,15 +10,7 @@ import {
 } from 'react-native';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { firestore } from '../firebaseConfig';
-import {
-  doc,
-  getDoc,
-  collection,
-  getDocs,
-  query,
-  where,
-} from 'firebase/firestore';
-import { normalizeLithuanian } from '../../components/NormalizeLithuanian';
+import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
 
 type StandingsStackParamList = {
   PlayerScreen: { playerID: string; teamID: string };
@@ -37,23 +29,19 @@ interface PlayerDoc {
   photoURL?: string;
   shirtNumber?: number;
   position?: string;
+  avgPTS?: number;
+  avgREB?: number;
+  avgAST?: number;
+  avgSTL?: number;
+  avgBLK?: number;
+  avgSecs?: number;
+  gamesPlayed?: number;
 }
 
-interface GameDoc {
-  homeTeam: string;
-  awayTeam: string;
-  finalPointsHome: number;
-  finalPointsAway: number;
-  winner?: string;
-}
-
-interface TeamDoc {
-  teamID: string;
-  teamName?: string;
-  icon?: string;
-}
-
-interface BoxScoreData {
+interface GameStats {
+  gameID: string;
+  opponentTeamName: string;
+  isWin: boolean;
   points: number;
   rebounds: number;
   assists: number;
@@ -62,34 +50,12 @@ interface BoxScoreData {
   minutes: string;
 }
 
-interface GameStats extends BoxScoreData {
-  gameID: string;
-  finalPointsHome: number;
-  finalPointsAway: number;
-  homeTeam: string;
-  awayTeam: string;
-  opponentTeamID: string;
-  opponentTeamName: string;
-  isWin: boolean;
-}
-
-interface OverallStats {
-  gamesPlayed: number;
-  avgPTS: number;
-  avgREB: number;
-  avgAST: number;
-  avgSTL: number;
-  avgBLK: number;
-  avgMins: string;
-}
-
 const PlayerScreen: React.FC = () => {
   const route = useRoute<PlayerScreenRouteProp>();
   const { playerID, teamID } = route.params;
 
   const [player, setPlayer] = useState<PlayerDoc | null>(null);
   const [gameStats, setGameStats] = useState<GameStats[]>([]);
-  const [overallStats, setOverallStats] = useState<OverallStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -97,161 +63,47 @@ const PlayerScreen: React.FC = () => {
       try {
         setLoading(true);
 
+        // Fetch player data
         const playerRef = doc(firestore, `teams/${teamID}/players`, playerID);
         const playerSnap = await getDoc(playerRef);
         if (playerSnap.exists()) {
           setPlayer(playerSnap.data() as PlayerDoc);
         }
 
-        const homeGamesQuery = query(
-          collection(firestore, 'games'),
-          where('homeTeam', '==', teamID)
-        );
-        const awayGamesQuery = query(
-          collection(firestore, 'games'),
-          where('awayTeam', '==', teamID)
-        );
-
-        const [homeGamesSnap, awayGamesSnap] = await Promise.all([
-          getDocs(homeGamesQuery),
-          getDocs(awayGamesQuery),
-        ]);
-
-        const allGameDocs = [...homeGamesSnap.docs, ...awayGamesSnap.docs];
-
-        let stats: GameStats[] = [];
-
-        let totalStats = {
-          gamesPlayed: 0,
-          points: 0,
-          rebounds: 0,
-          assists: 0,
-          steals: 0,
-          blocks: 0,
-          minutes: 0,
-        };
-
-        for (const gdoc of allGameDocs) {
-          const currentGameID = gdoc.id;
-          const gameData = gdoc.data() as GameDoc;
-
-          const boxScoreHomeSnap = await getDocs(
-            collection(firestore, `games/${currentGameID}/BoxScoreHome`)
+        // Fetch game stats
+        const gamesSnap = await getDocs(collection(firestore, 'games'));
+        const stats: GameStats[] = [];
+        for (const gDoc of gamesSnap.docs) {
+          const gameData = gDoc.data();
+          const boxScoresSnap = await getDocs(
+            collection(firestore, `games/${gDoc.id}/BoxScoreHome`)
           );
-          const boxScoreAwaySnap = await getDocs(
-            collection(firestore, `games/${currentGameID}/BoxScoreAway`)
-          );
-          const boxScores = [
-            ...boxScoreHomeSnap.docs,
-            ...boxScoreAwaySnap.docs,
-          ];
+          const playerStats = boxScoresSnap.docs
+            .map((docSnap) => docSnap.data())
+            .find(
+              (data) =>
+                data.name === `${playerSnap.data()?.firstName} ${playerSnap.data()?.lastName}`
+            );
 
-          function isBoxScoreData(
-            bsd: BoxScoreData | null
-          ): bsd is BoxScoreData {
-            return bsd !== null;
-          }
-
-          const playerBoxScores = boxScores
-            .map<BoxScoreData | null>((docSnap) => {
-              const data = docSnap.data();
-              if (
-                data.name ===
-                `${playerSnap.data()?.firstName} ${playerSnap.data()?.lastName}`
-              ) {
-                return {
-                  points: data.PTS || 0,
-                  rebounds: (data.OFFREB || 0) + (data.DEFFREB || 0),
-                  assists: data.AST || 0,
-                  steals: data.STL || 0,
-                  blocks: data.BLK || 0,
-                  minutes: data.MINS || '00:00',
-                };
-              }
-              return null;
-            })
-            .filter(isBoxScoreData);
-
-          if (playerBoxScores.length > 0) {
-            for (const pbs of playerBoxScores) {
-              const isHome = gameData.homeTeam === teamID;
-              const isWin = isHome
+          if (playerStats) {
+            const isWin =
+              gameData.homeTeam === teamID
                 ? gameData.finalPointsHome > gameData.finalPointsAway
                 : gameData.finalPointsAway > gameData.finalPointsHome;
 
-              const opponentTeamID = isHome
-                ? gameData.awayTeam
-                : gameData.homeTeam;
-
-              let opponentTeamName = opponentTeamID;
-              const teamsColl = collection(firestore, 'teams');
-              const teamQuery = query(
-                teamsColl,
-                where('teamID', '==', opponentTeamID)
-              );
-              const qSnap = await getDocs(teamQuery);
-              if (!qSnap.empty) {
-                const tDoc = qSnap.docs[0].data() as TeamDoc;
-                opponentTeamName = tDoc.teamName || opponentTeamID;
-              }
-
-              const convertedMinutes = convertMinsToFloat(pbs.minutes);
-              totalStats.gamesPlayed += 1;
-              totalStats.points += pbs.points;
-              totalStats.rebounds += pbs.rebounds;
-              totalStats.assists += pbs.assists;
-              totalStats.steals += pbs.steals;
-              totalStats.blocks += pbs.blocks;
-              totalStats.minutes += convertedMinutes;
-
-              stats.push({
-                gameID: currentGameID,
-                points: pbs.points,
-                rebounds: pbs.rebounds,
-                assists: pbs.assists,
-                blocks: pbs.blocks,
-                steals: pbs.steals,
-                minutes: pbs.minutes,
-
-                finalPointsHome: gameData.finalPointsHome,
-                finalPointsAway: gameData.finalPointsAway,
-                homeTeam: gameData.homeTeam,
-                awayTeam: gameData.awayTeam,
-                opponentTeamID,
-                opponentTeamName,
-                isWin,
-              });
-            }
+            stats.push({
+              gameID: gDoc.id,
+              opponentTeamName: gameData.awayTeam,
+              isWin,
+              points: playerStats.PTS || 0,
+              rebounds: (playerStats.OFFREB || 0) + (playerStats.DEFFREB || 0),
+              assists: playerStats.AST || 0,
+              steals: playerStats.STL || 0,
+              blocks: playerStats.BLK || 0,
+              minutes: formatMinutes(playerStats.secs || 0),
+            });
           }
         }
-
-        if (totalStats.gamesPlayed > 0) {
-          const {
-            gamesPlayed,
-            points,
-            rebounds,
-            assists,
-            steals,
-            blocks,
-            minutes,
-          } = totalStats;
-          const avgMinsFloat = minutes / gamesPlayed;
-          const avgMinsWhole = Math.floor(avgMinsFloat);
-          const avgMinsSecs = Math.round((avgMinsFloat - avgMinsWhole) * 60);
-
-          setOverallStats({
-            gamesPlayed,
-            avgPTS: points / gamesPlayed,
-            avgREB: rebounds / gamesPlayed,
-            avgAST: assists / gamesPlayed,
-            avgSTL: steals / gamesPlayed,
-            avgBLK: blocks / gamesPlayed,
-            avgMins: `${avgMinsWhole}:${String(avgMinsSecs).padStart(2, '0')}`,
-          });
-        } else {
-          setOverallStats(null);
-        }
-
         setGameStats(stats);
       } catch (err) {
         console.error('Error fetching player data:', err);
@@ -285,25 +137,19 @@ const PlayerScreen: React.FC = () => {
 
   const renderGameRow = ({ item }: { item: GameStats }) => {
     const resultColor = item.isWin ? 'green' : 'red';
-    const scoreStr = `${item.finalPointsHome} - ${item.finalPointsAway}`;
-    const isHome = item.homeTeam === teamID;
-    const venuePrefix = isHome ? 'vs' : '@';
+    const venuePrefix = item.isWin ? 'vs' : '@';
 
     return (
       <View style={styles.gameRow}>
         <Text style={styles.opponentLine}>
-          <Text style={styles.bold}>
-            {venuePrefix} {item.opponentTeamName}
-          </Text>{' '}
+          <Text style={styles.bold}>{venuePrefix} {item.opponentTeamName}</Text>{' '}
           <Text style={[styles.bold, { color: resultColor }]}>
-            {scoreStr}
+            {item.isWin ? 'W' : 'L'}
           </Text>
         </Text>
-
         <Text style={styles.statsLine}>
           PTS: {item.points}, REB: {item.rebounds}, AST: {item.assists},
-          {'  '}STL: {item.steals}, BLK: {item.blocks},
-          {'  '}MINS: {item.minutes}
+          {'  '}STL: {item.steals}, BLK: {item.blocks}, MINS: {item.minutes}
         </Text>
       </View>
     );
@@ -318,7 +164,6 @@ const PlayerScreen: React.FC = () => {
           ) : (
             <View style={[styles.playerPhoto, { backgroundColor: '#ccc' }]} />
           )}
-
           <View style={styles.bioContainer}>
             <Text style={styles.playerName}>
               {player.firstName} {player.lastName}
@@ -329,25 +174,22 @@ const PlayerScreen: React.FC = () => {
             {player.weight && <Text>Weight: {player.weight} kg</Text>}
           </View>
         </View>
-
-        {overallStats ? (
-          <View style={styles.overallStatsSection}>
-            <Text style={styles.sectionTitle}>Overall Stats</Text>
-            <Text>Games Played: {overallStats.gamesPlayed}</Text>
-            <Text>Avg PTS: {overallStats.avgPTS.toFixed(1)}</Text>
-            <Text>Avg REB: {overallStats.avgREB.toFixed(1)}</Text>
-            <Text>Avg AST: {overallStats.avgAST.toFixed(1)}</Text>
-            <Text>Avg STL: {overallStats.avgSTL.toFixed(1)}</Text>
-            <Text>Avg BLK: {overallStats.avgBLK.toFixed(1)}</Text>
-            <Text>Avg Mins: {overallStats.avgMins}</Text>
-          </View>
-        ) : (
-          <View style={styles.overallStatsSection}>
-            <Text style={styles.sectionTitle}>Overall Stats</Text>
-            <Text>No stats found for this player.</Text>
-          </View>
-        )}
-
+        <View style={styles.overallStatsSection}>
+          <Text style={styles.sectionTitle}>Overall Stats</Text>
+          {player.gamesPlayed ? (
+            <>
+              <Text>Games Played: {player.gamesPlayed}</Text>
+              <Text>Avg PTS: {player.avgPTS?.toFixed(1)}</Text>
+              <Text>Avg REB: {player.avgREB?.toFixed(1)}</Text>
+              <Text>Avg AST: {player.avgAST?.toFixed(1)}</Text>
+              <Text>Avg STL: {player.avgSTL?.toFixed(1)}</Text>
+              <Text>Avg BLK: {player.avgBLK?.toFixed(1)}</Text>
+              <Text>Avg Mins: {formatMinutes(player.avgSecs || 0)}</Text>
+            </>
+          ) : (
+            <Text>No stats available for this player.</Text>
+          )}
+        </View>
         <Text style={styles.sectionTitle}>Game by Game Stats</Text>
         <FlatList
           data={gameStats}
@@ -361,9 +203,10 @@ const PlayerScreen: React.FC = () => {
 
 export default PlayerScreen;
 
-function convertMinsToFloat(minsStr: string): number {
-  const [mins, secs] = minsStr.split(':').map(Number);
-  return (mins || 0) + ((secs || 0) / 60);
+function formatMinutes(totalSeconds: number): string {
+  const mins = Math.floor(totalSeconds / 60);
+  const secs = totalSeconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
 const styles = StyleSheet.create({

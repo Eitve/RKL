@@ -71,7 +71,7 @@ type BoxScoreDoc = {
   PF?: number;
   PLUSMINUS?: number;
   PTS?: number;
-  SECS?: number; // Seconds played in a game
+  secs?: number; // Seconds played in a game
   EFF?: number;
 };
 
@@ -172,7 +172,7 @@ const StatsLeadersScreen = () => {
               agg.pts += bData.PTS || 0;
               agg.eff += bData.EFF || 0;
 
-              agg.secs += bData.SECS || 0;
+              agg.secs += bData.secs || 0;
 
               agg.gamesPlayed += 1;
             });
