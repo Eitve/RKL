@@ -1,14 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  SafeAreaView,
-  View,
-  Text,
-  Image,
-  FlatList,
-  StyleSheet,
-  Switch,
-  TouchableOpacity,
-} from 'react-native';
+import { SafeAreaView, View, Text, Image, FlatList, StyleSheet, Switch, TouchableOpacity, } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { firestore } from '../firebaseConfig';
@@ -180,27 +171,27 @@ const ScheduleScreen = () => {
 
     return (
       <View style={styles.gameContainer}>
-        <View style={styles.teamRow}> {/* Home Team Row */}
+        <View style={styles.teamRow}>
           <Image
             source={{ uri: homeTeamDoc?.icon || '' }}
             style={styles.teamIconScheduled}
           />
           <Text style={styles.teamName}>{homeTeamDoc?.name || item.homeTeam}</Text>
         </View>
-    
-        <View style={styles.vsText}> {/* VS Row */}
+
+        <View style={styles.vsContainer}>
           <Text style={styles.vsText}>vs</Text>
         </View>
-    
-        <View style={styles.teamRow}> {/* Away Team Row */}
+
+        <View style={styles.teamRow}>
           <Image
             source={{ uri: awayTeamDoc?.icon || '' }}
             style={styles.teamIconScheduled}
           />
           <Text style={styles.teamName}>{awayTeamDoc?.name || item.awayTeam}</Text>
         </View>
-    
-        <View style={styles.bottomRow}> {/* Bottom Row with Arena and Date */}
+
+        <View style={styles.bottomRow}>
           <Text style={styles.arenaText}>
             {item.arena ? `Arena: ${item.arena}` : ''}
           </Text>
@@ -317,12 +308,18 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
+
+  vsContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 4,
+  },
   vsText: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#000',
-    marginHorizontal: 10,
   },
+
   gameDateText: {
     fontSize: 14,
     color: '#555',

@@ -1,22 +1,17 @@
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  Image,
-  StyleSheet,
-  ScrollView,
-  FlatList,
-  SafeAreaView,
-} from 'react-native';
-import { useRoute, RouteProp } from '@react-navigation/native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, Image, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, ActivityIndicator,} from 'react-native';
+import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { firestore } from '../firebaseConfig';
-import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, query, where,} from 'firebase/firestore';
 
-type StandingsStackParamList = {
-  PlayerScreen: { playerID: string; teamID: string };
-};
+import { StatisticsStackParamList } from './_layout';
 
-type PlayerScreenRouteProp = RouteProp<StandingsStackParamList, 'PlayerScreen'>;
+type PlayerScreenRouteProp = RouteProp<StatisticsStackParamList, 'PlayerScreen'>;
+type PlayerScreenNavProp = NativeStackNavigationProp<
+  StatisticsStackParamList,
+  'PlayerScreen'
+>;
 
 interface PlayerDoc {
   firstName?: string;
@@ -40,7 +35,8 @@ interface PlayerDoc {
 
 interface GameStats {
   gameID: string;
-  opponentTeamName: string;
+  finalScore: string;
+  opponentTeamName: string; 
   isWin: boolean;
   points: number;
   rebounds: number;
@@ -50,8 +46,16 @@ interface GameStats {
   minutes: string;
 }
 
+function formatMinutes(totalSeconds: number): string {
+  const mins = Math.floor(totalSeconds / 60);
+  const secs = totalSeconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
 const PlayerScreen: React.FC = () => {
   const route = useRoute<PlayerScreenRouteProp>();
+  const navigation = useNavigation<PlayerScreenNavProp>();
+
   const { playerID, teamID } = route.params;
 
   const [player, setPlayer] = useState<PlayerDoc | null>(null);
@@ -63,48 +67,79 @@ const PlayerScreen: React.FC = () => {
       try {
         setLoading(true);
 
-        // Fetch player data
         const playerRef = doc(firestore, `teams/${teamID}/players`, playerID);
         const playerSnap = await getDoc(playerRef);
         if (playerSnap.exists()) {
           setPlayer(playerSnap.data() as PlayerDoc);
         }
 
-        // Fetch game stats
         const gamesSnap = await getDocs(collection(firestore, 'games'));
-        const stats: GameStats[] = [];
+        const statsArray: GameStats[] = [];
+
         for (const gDoc of gamesSnap.docs) {
-          const gameData = gDoc.data();
-          const boxScoresSnap = await getDocs(
-            collection(firestore, `games/${gDoc.id}/BoxScoreHome`)
-          );
-          const playerStats = boxScoresSnap.docs
-            .map((docSnap) => docSnap.data())
-            .find(
-              (data) =>
-                data.name === `${playerSnap.data()?.firstName} ${playerSnap.data()?.lastName}`
-            );
+          const gameData: any = gDoc.data();
+          const homeTeamID = gameData.homeTeam;
+          const awayTeamID = gameData.awayTeam;
+          const homeScore = gameData.finalPointsHome;
+          const awayScore = gameData.finalPointsAway;
 
-          if (playerStats) {
-            const isWin =
-              gameData.homeTeam === teamID
-                ? gameData.finalPointsHome > gameData.finalPointsAway
-                : gameData.finalPointsAway > gameData.finalPointsHome;
+          const isHome = homeTeamID === teamID;
+          const isAway = awayTeamID === teamID;
+          if (!isHome && !isAway) continue;
 
-            stats.push({
+          const finalScore = `${homeScore}-${awayScore}`;
+
+          const isWin = (isHome && homeScore > awayScore) || (isAway && awayScore > homeScore);
+
+          const opponentID = isHome ? awayTeamID : homeTeamID;
+
+          let opponentTeamName = opponentID;
+          const teamsRef = collection(firestore, 'teams');
+          const oppQ = query(teamsRef, where('teamID', '==', opponentID));
+          const oppSnap = await getDocs(oppQ);
+          if (!oppSnap.empty) {
+            const oppDocData: any = oppSnap.docs[0].data();
+            opponentTeamName = oppDocData.teamName || opponentID;
+          }
+
+          const boxCollName = isHome ? 'BoxScoreHome' : 'BoxScoreAway';
+          const boxSnap = await getDocs(collection(firestore, `games/${gDoc.id}/${boxCollName}`));
+
+          let foundBox: any = null;
+          if (playerSnap.exists()) {
+            const fullName = `${playerSnap.data()?.firstName} ${playerSnap.data()?.lastName}`.trim();
+            boxSnap.forEach((doc) => {
+              const d = doc.data();
+              if (d.name && d.name.trim() === fullName) {
+                foundBox = d;
+              }
+            });
+          }
+
+          if (foundBox) {
+            const points = foundBox.PTS || 0;
+            const rebounds = (foundBox.OFFREB || 0) + (foundBox.DEFFREB || 0);
+            const assists = foundBox.AST || 0;
+            const steals = foundBox.STL || 0;
+            const blocks = foundBox.BLK || 0;
+            const minutes = formatMinutes(foundBox.secs || 0);
+
+            statsArray.push({
               gameID: gDoc.id,
-              opponentTeamName: gameData.awayTeam,
+              finalScore,
+              opponentTeamName,
               isWin,
-              points: playerStats.PTS || 0,
-              rebounds: (playerStats.OFFREB || 0) + (playerStats.DEFFREB || 0),
-              assists: playerStats.AST || 0,
-              steals: playerStats.STL || 0,
-              blocks: playerStats.BLK || 0,
-              minutes: formatMinutes(playerStats.secs || 0),
+              points,
+              rebounds,
+              assists,
+              steals,
+              blocks,
+              minutes,
             });
           }
         }
-        setGameStats(stats);
+
+        setGameStats(statsArray);
       } catch (err) {
         console.error('Error fetching player data:', err);
       } finally {
@@ -115,10 +150,20 @@ const PlayerScreen: React.FC = () => {
     fetchPlayerData();
   }, [playerID, teamID]);
 
+  const handleGamePress = useCallback(
+    (gameID: string) => {
+      const gameIDNum = parseInt(gameID, 10) || 0;
+      navigation.navigate('GameDetails', { gameID: gameIDNum });
+    },
+    [navigation]
+  );
+
+
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.centered}>
+          <ActivityIndicator size="large" />
           <Text>Loading Player Data...</Text>
         </View>
       </SafeAreaView>
@@ -137,27 +182,26 @@ const PlayerScreen: React.FC = () => {
 
   const renderGameRow = ({ item }: { item: GameStats }) => {
     const resultColor = item.isWin ? 'green' : 'red';
-    const venuePrefix = item.isWin ? 'vs' : '@';
+    const resultLabel = item.isWin ? 'W' : 'L';
 
     return (
-      <View style={styles.gameRow}>
+      <TouchableOpacity onPress={() => handleGamePress(item.gameID)} style={styles.gameRow}>
         <Text style={styles.opponentLine}>
-          <Text style={styles.bold}>{venuePrefix} {item.opponentTeamName}</Text>{' '}
-          <Text style={[styles.bold, { color: resultColor }]}>
-            {item.isWin ? 'W' : 'L'}
-          </Text>
+          <Text style={styles.bold}>{item.opponentTeamName}</Text>{' '}
+          <Text>{item.finalScore}</Text>{'  '}
+          <Text style={[styles.bold, { color: resultColor }]}>{resultLabel}</Text>
         </Text>
         <Text style={styles.statsLine}>
           PTS: {item.points}, REB: {item.rebounds}, AST: {item.assists},
           {'  '}STL: {item.steals}, BLK: {item.blocks}, MINS: {item.minutes}
         </Text>
-      </View>
+      </TouchableOpacity>
     );
   };
 
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container}>
+  const renderListHeader = () => {
+    return (
+      <View>
         <View style={styles.topSection}>
           {player.photoURL ? (
             <Image source={{ uri: player.photoURL }} style={styles.playerPhoto} />
@@ -174,6 +218,7 @@ const PlayerScreen: React.FC = () => {
             {player.weight && <Text>Weight: {player.weight} kg</Text>}
           </View>
         </View>
+
         <View style={styles.overallStatsSection}>
           <Text style={styles.sectionTitle}>Overall Stats</Text>
           {player.gamesPlayed ? (
@@ -190,31 +235,29 @@ const PlayerScreen: React.FC = () => {
             <Text>No stats available for this player.</Text>
           )}
         </View>
+
         <Text style={styles.sectionTitle}>Game by Game Stats</Text>
-        <FlatList
-          data={gameStats}
-          keyExtractor={(item) => item.gameID}
-          renderItem={renderGameRow}
-        />
-      </ScrollView>
+      </View>
+    );
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <FlatList
+        data={gameStats}
+        keyExtractor={(item) => item.gameID}
+        renderItem={renderGameRow}
+        ListHeaderComponent={renderListHeader}
+        contentContainerStyle={{ paddingBottom: 20 }}
+      />
     </SafeAreaView>
   );
 };
 
 export default PlayerScreen;
 
-function formatMinutes(totalSeconds: number): string {
-  const mins = Math.floor(totalSeconds / 60);
-  const secs = totalSeconds % 60;
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
-
 const styles = StyleSheet.create({
   safeArea: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  container: {
     flex: 1,
     backgroundColor: '#fff',
   },
@@ -223,6 +266,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+
   topSection: {
     flexDirection: 'row',
     padding: 16,
@@ -241,8 +285,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 6,
   },
+
   overallStatsSection: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 10,
   },
   sectionTitle: {
     fontSize: 18,
@@ -250,6 +296,7 @@ const styles = StyleSheet.create({
     marginVertical: 8,
     marginLeft: 16,
   },
+
   gameRow: {
     paddingVertical: 8,
     paddingHorizontal: 16,
@@ -260,11 +307,11 @@ const styles = StyleSheet.create({
     marginBottom: 2,
     fontSize: 14,
   },
-  bold: {
-    fontWeight: '600',
-  },
   statsLine: {
     fontSize: 14,
     color: '#555',
+  },
+  bold: {
+    fontWeight: '600',
   },
 });

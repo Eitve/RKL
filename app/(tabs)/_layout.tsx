@@ -27,6 +27,10 @@ export type StandingsStackParamList = {
   TeamScreen: { teamName: string };
   PlayerScreen: { playerID: string };
 };
+export type StatisticsStackParamList = {
+  StatisticsMain: undefined;
+  PlayerScreen: { playerID: string; teamID: string }; // or whatever your PlayerScreen requires
+};
 
 const Tab = createBottomTabNavigator();
 const HomeStack = createNativeStackNavigator<RootStackParamList>();
@@ -90,7 +94,36 @@ function StandingsStackScreen() {
         component={PlayerScreen}
         options={{ headerShown: false }}
       />
+      <ScheduleStack.Screen
+        name="GameDetails"
+        component={GameDetailsScreen}
+        options={{ headerShown: false }}
+      />
     </StandingsStack.Navigator>
+  );
+}
+
+function StatisticsStackScreen() {
+  const StatisticsStack = createNativeStackNavigator<StatisticsStackParamList>();
+
+  return (
+    <StatisticsStack.Navigator>
+      <StatisticsStack.Screen
+        name="StatisticsMain"
+        component={StatisticsScreen}
+        options={{ headerShown: false }}
+      />
+      <StatisticsStack.Screen
+        name="PlayerScreen"
+        component={PlayerScreen}
+        options={{ headerShown: false }}
+      />
+            <ScheduleStack.Screen
+        name="GameDetails"
+        component={GameDetailsScreen}
+        options={{ headerShown: false }}
+      />
+    </StatisticsStack.Navigator>
   );
 }
 
@@ -98,28 +131,29 @@ export default function AppTabs() {
   return (
     <NavigationContainer>
       <ThemeProvider theme={theme}>
-        <Tab.Navigator initialRouteName="Home">
-          <Tab.Screen
-            name="ScheduleStack"
-            component={ScheduleStackScreen}
-            options={{ headerShown: false, title: 'Schedule' }}
-          />
-          <Tab.Screen
-            name="StandingsStack"
-            component={StandingsStackScreen}
-            options={{ headerShown: false, title: 'Standings' }}
-          />
-          <Tab.Screen
-            name="Home"
-            component={HomeStackScreen}
-            options={{ headerShown: false, title: 'Home' }}
-          />
-          <Tab.Screen
-            name="Statistics"
-            component={StatisticsScreen}
-            options={{ headerShown: false }}
-          />
-        </Tab.Navigator>
+      <Tab.Navigator initialRouteName="Home">
+  <Tab.Screen
+    name="ScheduleStack"
+    component={ScheduleStackScreen}
+    options={{ headerShown: false, title: 'Schedule' }}
+  />
+  <Tab.Screen
+    name="StandingsStack"
+    component={StandingsStackScreen}
+    options={{ headerShown: false, title: 'Standings' }}
+  />
+  <Tab.Screen
+    name="Home"
+    component={HomeStackScreen}
+    options={{ headerShown: false, title: 'Home' }}
+  />
+<Tab.Screen
+  name="StatisticsStack"
+  component={StatisticsStackScreen}
+  options={{ headerShown: false, title: 'Statistics' }}
+/>
+</Tab.Navigator>
+
       </ThemeProvider>
     </NavigationContainer>
   );

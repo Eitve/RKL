@@ -1,24 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ActivityIndicator,
-  FlatList,
-  TouchableOpacity,
-  Image,
-} from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, FlatList, TouchableOpacity, Image, } from 'react-native';
 import { firestore } from '../firebaseConfig';
-import {
-  collection,
-  getDocs,
-  doc,
-  QuerySnapshot,
-  DocumentData,
-  updateDoc,
-} from 'firebase/firestore';
-
-// Utility function to format seconds to MM:SS
+import { collection, getDocs, doc, QuerySnapshot, DocumentData, updateDoc, } from 'firebase/firestore';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { StatisticsStackParamList } from './_layout';
 function toMMSS(totalSecs: number): string {
   const mm = Math.floor(totalSecs / 60);
   const ss = totalSecs % 60;
@@ -49,7 +35,7 @@ type PlayerAggregatedStats = {
   pf: number;
   plusMinus: number;
   pts: number;
-  secs: number; // Total seconds played
+  secs: number;
   eff: number;
   gamesPlayed: number;
 };
@@ -71,23 +57,42 @@ type BoxScoreDoc = {
   PF?: number;
   PLUSMINUS?: number;
   PTS?: number;
-  secs?: number; // Seconds played in a game
+  secs?: number;
   EFF?: number;
 };
 
-const StatsLeadersScreen = () => {
+type PositionFilter = 'ALL' | 'PG' | 'SG' | 'SF' | 'PF' | 'C';
+type StatFilter =
+  | 'PTS'
+  | 'REB'
+  | 'AST'
+  | 'STL'
+  | 'BLK'
+  | 'FG%'
+  | '2PT%'
+  | '3PT%'
+  | 'FT%'
+  | 'EFF';
+
+type StatisticsNavigationProp = NativeStackNavigationProp<
+  StatisticsStackParamList,
+  'StatisticsMain'
+>;
+
+const StatisticsScreen: React.FC = () => {
+  const navigation = useNavigation<StatisticsNavigationProp>();
+
   const [playersMap, setPlayersMap] = useState<Record<string, PlayerAggregatedStats>>({});
   const [loading, setLoading] = useState(true);
 
-  const [positionFilter, setPositionFilter] = useState<'ALL' | 'PG' | 'SG' | 'SF' | 'PF' | 'C'>('ALL');
-  const [statFilter, setStatFilter] = useState<'PTS' | 'REB' | 'AST' | 'STL' | 'BLK' | 'FG%' | '2PT%' | '3PT%' | 'FT%' | 'EFF'>('PTS');
+  const [positionFilter, setPositionFilter] = useState<PositionFilter>('ALL');
+  const [statFilter, setStatFilter] = useState<StatFilter>('PTS');
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
 
-        // 1) Gather Teams and initialize aggregator
         const teamsSnap = await getDocs(collection(firestore, 'teams'));
         const aggregator: Record<string, PlayerAggregatedStats> = {};
 
@@ -122,14 +127,13 @@ const StatsLeadersScreen = () => {
               pf: 0,
               plusMinus: 0,
               pts: 0,
-              secs: 0, // Initialize total seconds to 0
+              secs: 0,
               eff: 0,
               gamesPlayed: 0,
             };
           }
         }
 
-        // 2) Gather all games and their boxscores
         const gSnap = await getDocs(collection(firestore, 'games'));
         for (const gDoc of gSnap.docs) {
           const gRef = doc(firestore, 'games', gDoc.id);
@@ -145,8 +149,8 @@ const StatsLeadersScreen = () => {
               let matchedKey: string | null = null;
 
               for (const [k, agg] of Object.entries(aggregator)) {
-                const fullN = (agg.firstName + ' ' + agg.lastName).toLowerCase().trim();
-                if (fullN === lowerName) {
+                const fullName = `${agg.firstName} ${agg.lastName}`.toLowerCase().trim();
+                if (fullName === lowerName) {
                   matchedKey = k;
                   break;
                 }
@@ -154,7 +158,6 @@ const StatsLeadersScreen = () => {
               if (!matchedKey) return;
 
               const agg = aggregator[matchedKey];
-
               agg.twoPM += bData['2PM'] || 0;
               agg.twoPA += bData['2PA'] || 0;
               agg.threePM += bData['3PM'] || 0;
@@ -171,9 +174,7 @@ const StatsLeadersScreen = () => {
               agg.plusMinus += bData.PLUSMINUS || 0;
               agg.pts += bData.PTS || 0;
               agg.eff += bData.EFF || 0;
-
               agg.secs += bData.secs || 0;
-
               agg.gamesPlayed += 1;
             });
           };
@@ -210,7 +211,6 @@ const StatsLeadersScreen = () => {
           if (st.FTA > 0) ftPct = (st.FTM / st.FTA) * 100;
 
           const avgEFF = st.eff / gp;
-
           const avgSecs = st.secs / gp;
 
           try {
@@ -248,17 +248,9 @@ const StatsLeadersScreen = () => {
     fetchData();
   }, []);
 
-  if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" />
-        <Text>Loading stats...</Text>
-      </View>
-    );
-  }
-
   const getFilteredSortedPlayers = () => {
     let playersArr = Object.values(playersMap);
+
     if (positionFilter !== 'ALL') {
       playersArr = playersArr.filter((p) =>
         p.position.toUpperCase().includes(positionFilter.toUpperCase())
@@ -268,21 +260,31 @@ const StatsLeadersScreen = () => {
     const getStatValue = (p: PlayerAggregatedStats): number => {
       const gp = p.gamesPlayed || 1;
       switch (statFilter) {
-        case 'PTS': return p.pts / gp;
-        case 'REB': return (p.offReb + p.defReb) / gp;
-        case 'AST': return p.ast / gp;
-        case 'STL': return p.stl / gp;
-        case 'BLK': return p.blk / gp;
+        case 'PTS':
+          return p.pts / gp;
+        case 'REB':
+          return (p.offReb + p.defReb) / gp;
+        case 'AST':
+          return p.ast / gp;
+        case 'STL':
+          return p.stl / gp;
+        case 'BLK':
+          return p.blk / gp;
         case 'FG%': {
           const made = p.twoPM + p.threePM;
           const att = p.twoPA + p.threePA;
           return att ? (made / att) * 100 : 0;
         }
-        case '2PT%': return p.twoPA ? (p.twoPM / p.twoPA) * 100 : 0;
-        case '3PT%': return p.threePA ? (p.threePM / p.threePA) * 100 : 0;
-        case 'FT%': return p.FTA ? (p.FTM / p.FTA) * 100 : 0;
-        case 'EFF': return p.eff / gp;
-        default: return 0;
+        case '2PT%':
+          return p.twoPA ? (p.twoPM / p.twoPA) * 100 : 0;
+        case '3PT%':
+          return p.threePA ? (p.threePM / p.threePA) * 100 : 0;
+        case 'FT%':
+          return p.FTA ? (p.FTM / p.FTA) * 100 : 0;
+        case 'EFF':
+          return p.eff / gp;
+        default:
+          return 0;
       }
     };
 
@@ -294,34 +296,53 @@ const StatsLeadersScreen = () => {
 
   const renderLeader = ({ item }: { item: PlayerAggregatedStats }) => {
     const gp = item.gamesPlayed || 1;
+    const mmss = toMMSS(Math.round(item.secs / gp));
+
     const val = (() => {
+      const gp = item.gamesPlayed || 1;
       switch (statFilter) {
-        case 'PTS': return item.pts / gp;
-        case 'REB': return (item.offReb + item.defReb) / gp;
-        case 'AST': return item.ast / gp;
-        case 'STL': return item.stl / gp;
-        case 'BLK': return item.blk / gp;
+        case 'PTS':
+          return item.pts / gp;
+        case 'REB':
+          return (item.offReb + item.defReb) / gp;
+        case 'AST':
+          return item.ast / gp;
+        case 'STL':
+          return item.stl / gp;
+        case 'BLK':
+          return item.blk / gp;
         case 'FG%': {
           const made = item.twoPM + item.threePM;
           const att = item.twoPA + item.threePA;
           return att ? (made / att) * 100 : 0;
         }
-        case '2PT%': return item.twoPA ? (item.twoPM / item.twoPA) * 100 : 0;
-        case '3PT%': return item.threePA ? (item.threePM / item.threePA) * 100 : 0;
-        case 'FT%': return item.FTA ? (item.FTM / item.FTA) * 100 : 0;
-        case 'EFF': return item.eff / gp;
-        default: return 0;
+        case '2PT%':
+          return item.twoPA ? (item.twoPM / item.twoPA) * 100 : 0;
+        case '3PT%':
+          return item.threePA ? (item.threePM / item.threePA) * 100 : 0;
+        case 'FT%':
+          return item.FTA ? (item.FTM / item.FTA) * 100 : 0;
+        case 'EFF':
+          return item.eff / gp;
+        default:
+          return 0;
       }
     })();
+
     const statDisplay = statFilter.includes('%')
       ? `${val.toFixed(1)}%`
       : val.toFixed(1);
 
-    // Convert average secs to mm:ss
-    const mmss = toMMSS(Math.round(item.secs / gp));
+    const handlePress = () => {
+      const [teamID, playerID] = item.id.split('-');
+      navigation.navigate('PlayerScreen', {
+        teamID,
+        playerID,
+      });
+    };
 
     return (
-      <View style={styles.playerRow}>
+      <TouchableOpacity style={styles.playerRow} onPress={handlePress}>
         {item.photoURL ? (
           <Image source={{ uri: item.photoURL }} style={styles.playerImage} />
         ) : (
@@ -338,16 +359,25 @@ const StatsLeadersScreen = () => {
             {statFilter}: {statDisplay}
           </Text>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
-  const handlePositionPress = (pos: typeof positionFilter) => {
+  const handlePositionPress = (pos: PositionFilter) => {
     setPositionFilter(pos);
   };
-  const handleStatPress = (stat: typeof statFilter) => {
+  const handleStatPress = (stat: StatFilter) => {
     setStatFilter(stat);
   };
+
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" />
+        <Text>Loading stats...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -395,7 +425,7 @@ const StatsLeadersScreen = () => {
   );
 };
 
-export default StatsLeadersScreen;
+export default StatisticsScreen;
 
 const styles = StyleSheet.create({
   container: {
