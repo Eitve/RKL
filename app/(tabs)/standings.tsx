@@ -1,15 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import {
-  SafeAreaView,
-  View,
-  Text,
-  Image,
-  FlatList,
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  ScrollView,
-} from 'react-native';
+import {SafeAreaView, View, Text, Image, FlatList, ActivityIndicator, Pressable, StyleSheet, Switch, } from 'react-native';
 import { firestore } from '../firebaseConfig';
 import { collection, getDocs } from 'firebase/firestore';
 import { useNavigation } from '@react-navigation/native';
@@ -53,6 +43,7 @@ const StandingsScreen: React.FC = () => {
   const [games, setGames] = useState<GameProps[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDivision, setSelectedDivision] = useState<'A' | 'B-A' | 'B-B'>('A');
+  const [showDetails, setShowDetails] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -193,9 +184,13 @@ const StandingsScreen: React.FC = () => {
           <Text style={[styles.headerCell, { flex: 0.6, textAlign: 'right' }]}>GP</Text>
           <Text style={[styles.headerCell, { flex: 0.6, textAlign: 'right' }]}>W</Text>
           <Text style={[styles.headerCell, { flex: 0.6, textAlign: 'right' }]}>L</Text>
-          <Text style={[styles.headerCell, { flex: 0.8, textAlign: 'right' }]}>Pts-</Text>
-          <Text style={[styles.headerCell, { flex: 0.8, textAlign: 'right' }]}>Pts+</Text>
-          <Text style={[styles.headerCell, { flex: 0.8, textAlign: 'right' }]}>Diff</Text>
+          {showDetails && (
+            <>
+              <Text style={[styles.headerCell, { flex: 0.8, textAlign: 'right' }]}>Pts-</Text>
+              <Text style={[styles.headerCell, { flex: 0.8, textAlign: 'right' }]}>Pts+</Text>
+              <Text style={[styles.headerCell, { flex: 0.8, textAlign: 'right' }]}>Diff</Text>
+            </>
+          )}
           <Text style={[styles.headerCell, { flex: 0.6, textAlign: 'right' }]}>P</Text>
         </View>
 
@@ -217,7 +212,6 @@ const StandingsScreen: React.FC = () => {
               <Pressable
                 style={styles.tableRow}
                 onPress={() => {
-                  // Pass the docID as "teamName"
                   navigation.navigate('TeamScreen', {
                     teamName: team.docID,
                   });
@@ -225,7 +219,6 @@ const StandingsScreen: React.FC = () => {
               >
                 <Text style={[styles.cellText, { flex: 0.5 }, colorStyle]}>{place}</Text>
 
-                {/* Team name & icon */}
                 <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center' }}>
                   {team.icon ? (
                     <Image source={{ uri: team.icon }} style={styles.teamIcon} />
@@ -234,13 +227,11 @@ const StandingsScreen: React.FC = () => {
                   )}
                   <Text
                     style={[styles.cellText, styles.teamName]}
-                    numberOfLines={1}
                   >
                     {team.teamName ?? 'Unnamed'}
                   </Text>
                 </View>
 
-                {/* Right-aligned numeric fields */}
                 <Text style={[styles.cellText, styles.numCell, { flex: 0.6 }]}>
                   {team.gamesPlayed ?? 0}
                 </Text>
@@ -250,15 +241,21 @@ const StandingsScreen: React.FC = () => {
                 <Text style={[styles.cellText, styles.numCell, { flex: 0.6 }]}>
                   {team.losses ?? 0}
                 </Text>
-                <Text style={[styles.cellText, styles.numCell, { flex: 0.8 }]}>
-                  {team.ptsMinus ?? 0}
-                </Text>
-                <Text style={[styles.cellText, styles.numCell, { flex: 0.8 }]}>
-                  {team.ptsPlus ?? 0}
-                </Text>
-                <Text style={[styles.cellText, styles.numCell, { flex: 0.8 }]}>
-                  {team.ptsDifference ?? 0}
-                </Text>
+
+                {showDetails && (
+                  <>
+                    <Text style={[styles.cellText, styles.numCell, { flex: 0.8 }]}>
+                      {team.ptsMinus ?? 0}
+                    </Text>
+                    <Text style={[styles.cellText, styles.numCell, { flex: 0.8 }]}>
+                      {team.ptsPlus ?? 0}
+                    </Text>
+                    <Text style={[styles.cellText, styles.numCell, { flex: 0.8 }]}>
+                      {team.ptsDifference ?? 0}
+                    </Text>
+                  </>
+                )}
+
                 <Text style={[styles.cellText, styles.numCell, { flex: 0.6 }]}>
                   {team.standingPoints ?? 0}
                 </Text>
@@ -302,6 +299,14 @@ const StandingsScreen: React.FC = () => {
         </Pressable>
       </View>
 
+      <View style={styles.switchContainer}>
+        <Text style={styles.switchLabel}>Details</Text>
+        <Switch
+          value={showDetails}
+          onValueChange={(val) => setShowDetails(val)}
+        />
+      </View>
+
       {renderStandings()}
     </SafeAreaView>
   );
@@ -331,6 +336,16 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#000',
     fontWeight: 'bold',
+  },
+  switchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  switchLabel: {
+    fontSize: 16,
+    marginRight: 8,
   },
   loadingContainer: {
     marginTop: 50,
@@ -379,7 +394,8 @@ const styles = StyleSheet.create({
   },
   teamName: {
     fontWeight: '600',
-    flexShrink: 1,
+    flex: 1,
+    flexWrap: 'wrap',
   },
   numCell: {
     textAlign: 'right',
