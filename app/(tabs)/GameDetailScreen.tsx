@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import {View, Text, StyleSheet, ActivityIndicator, ScrollView, Image,} from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Image } from 'react-native';
 import { RouteProp, useRoute } from '@react-navigation/native';
-import {doc, getDoc, collection, getDocs, query, where,} from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { firestore } from '../firebaseConfig';
 import { ScheduleStackParamList } from './_layout';
 
+// Function to remove Lithuanian characters and make all lowercase
 function normalizeID(input: string): string {
   return input
     .toLowerCase()
@@ -17,11 +18,13 @@ function normalizeID(input: string): string {
     .replace(/ų/g, 'u')
     .replace(/ū/g, 'u')
     .replace(/ž/g, 'z')
-    .replace(/\s+/g, '');
+    .replace(/\s+/g, ''); // Removes spaces
 }
 
+// Defining route type for navigation
 type GameDetailsRouteProp = RouteProp<ScheduleStackParamList, 'GameDetails'>;
 
+// Overall game details (i.e., teams, points, game ID)
 interface GameDetail {
   gameID: number;
   homeTeam: string;  
@@ -30,12 +33,14 @@ interface GameDetail {
   finalPointsAway: number;
 }
 
+// Interface representing team document structure
 interface TeamDoc {
   teamID: string;
   teamName?: string;
   icon?: string;
 }
 
+// Each player has statistics; here is what goes into the box score for EACH player
 interface BoxScorePlayer {
   name: string;     
   isStarter?: boolean;
@@ -58,11 +63,15 @@ interface BoxScorePlayer {
   PTS?: number;
 }
 
+// Getting position and shirt number from the player within a team document in the database to save time inputting number/position
+// This doesn't even work yet :/
+// I shouldn't even do this, since, at least in lower competition, you don't play 100% of your games with the same number, gotta look into it
 interface PlayerDoc {
   shirtNumber?: number;
   position?: string;
 }
 
+// Extended interface for box score rows including computed statistics
 interface BoxScoreRow extends BoxScorePlayer {
   shirtNumber?: number;
   position?: string;
@@ -75,6 +84,7 @@ interface BoxScoreRow extends BoxScorePlayer {
   REB?: number;     
 }
 
+// Constant defining the columns to display in the box score table
 const STAT_COLUMNS = [
   { key: 'Mins',        label: 'Mins',     width: 50 },
   { key: 'PTS',         label: 'PTS',      width: 50 },
@@ -99,171 +109,199 @@ const STAT_COLUMNS = [
   { key: 'PLUSMINUS',   label: '+/-',      width: 50 },
 ];
 
+// Main component for displaying game details and box scores
 export default function GameDetailsScreen() {
+  // Access route parameters to get the gameID
   const route = useRoute<GameDetailsRouteProp>();
   const { gameID } = route.params;
 
-  const [loading, setLoading] = useState(true);
-  const [gameDetail, setGameDetail] = useState<GameDetail | null>(null);
+  // State variables for loading status, game details, team documents, and box score rows
+  const [isLoading, setIsLoading] = useState(true);
+  const [gameDetails, setGameDetails] = useState<GameDetail | null>(null);
 
-  const [homeTeamDoc, setHomeTeamDoc] = useState<TeamDoc | null>(null);
-  const [awayTeamDoc, setAwayTeamDoc] = useState<TeamDoc | null>(null);
+  const [homeTeamDocument, setHomeTeamDocument] = useState<TeamDoc | null>(null);
+  const [awayTeamDocument, setAwayTeamDocument] = useState<TeamDoc | null>(null);
 
-  const [homeRows, setHomeRows] = useState<BoxScoreRow[]>([]);
-  const [awayRows, setAwayRows] = useState<BoxScoreRow[]>([]);
+  const [homeBoxScoreRows, setHomeBoxScoreRows] = useState<BoxScoreRow[]>([]);
+  const [awayBoxScoreRows, setAwayBoxScoreRows] = useState<BoxScoreRow[]>([]);
 
+  // useEffect hook to fetch data when the component mounts or gameID changes
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchGameData = async () => {
       try {
-        setLoading(true);
+        setIsLoading(true); // Start loading
 
-        const gameRef = doc(firestore, 'games', String(gameID));
-        const gameSnap = await getDoc(gameRef);
-        if (!gameSnap.exists()) {
+        // Reference to the specific game document in Firestore
+        const gameDocumentRef = doc(firestore, 'games', String(gameID));
+        const gameDocumentSnapshot = await getDoc(gameDocumentRef); // Fetch game document
+
+        if (!gameDocumentSnapshot.exists()) {
           console.warn(`Game ${gameID} not found.`);
-          return;
+          return; // Exit if game not found
         }
-        const gameData = gameSnap.data() as GameDetail;
-        setGameDetail(gameData);
 
-        const teamsColl = collection(firestore, 'teams');
-        const [homeQSnap, awayQSnap] = await Promise.all([
-          getDocs(query(teamsColl, where('teamID', '==', gameData.homeTeam))),
-          getDocs(query(teamsColl, where('teamID', '==', gameData.awayTeam))),
+        const fetchedGameDetails = gameDocumentSnapshot.data() as GameDetail;
+        setGameDetails(fetchedGameDetails); // Set game details state
+
+        const teamsCollectionRef = collection(firestore, 'teams'); // Reference to teams collection
+
+        // Fetch home and away team documents concurrently
+        const [homeTeamQuerySnapshot, awayTeamQuerySnapshot] = await Promise.all([
+          getDocs(query(teamsCollectionRef, where('teamID', '==', fetchedGameDetails.homeTeam))),
+          getDocs(query(teamsCollectionRef, where('teamID', '==', fetchedGameDetails.awayTeam))),
         ]);
 
-        let homeTeamRef = null;
-        let awayTeamRef = null;
+        let homeTeamDocumentRef: any = null;
+        let awayTeamDocumentRef: any = null;
 
-        if (!homeQSnap.empty) {
-          const ht = homeQSnap.docs[0];
-          setHomeTeamDoc(ht.data() as TeamDoc);
-          homeTeamRef = ht.ref;
+        // Process home team document
+        if (!homeTeamQuerySnapshot.empty) {
+          const homeTeamDocSnapshot = homeTeamQuerySnapshot.docs[0];
+          setHomeTeamDocument(homeTeamDocSnapshot.data() as TeamDoc);
+          homeTeamDocumentRef = homeTeamDocSnapshot.ref;
         } else {
-          console.warn(`No doc found for homeTeam = ${gameData.homeTeam}`);
-        }
-        if (!awayQSnap.empty) {
-          const at = awayQSnap.docs[0];
-          setAwayTeamDoc(at.data() as TeamDoc);
-          awayTeamRef = at.ref;
-        } else {
-          console.warn(`No doc found for awayTeam = ${gameData.awayTeam}`);
+          console.warn(`No document found for homeTeam = ${fetchedGameDetails.homeTeam}`);
         }
 
-        const [boxHomeSnap, boxAwaySnap] = await Promise.all([
-          getDocs(collection(gameRef, 'BoxScoreHome')),
-          getDocs(collection(gameRef, 'BoxScoreAway')),
+        // Process away team document
+        if (!awayTeamQuerySnapshot.empty) {
+          const awayTeamDocSnapshot = awayTeamQuerySnapshot.docs[0];
+          setAwayTeamDocument(awayTeamDocSnapshot.data() as TeamDoc);
+          awayTeamDocumentRef = awayTeamDocSnapshot.ref;
+        } else {
+          console.warn(`No document found for awayTeam = ${fetchedGameDetails.awayTeam}`);
+        }
+
+        // Fetch box score data for home and away teams concurrently
+        const [homeBoxScoreSnapshot, awayBoxScoreSnapshot] = await Promise.all([
+          getDocs(collection(gameDocumentRef, 'BoxScoreHome')),
+          getDocs(collection(gameDocumentRef, 'BoxScoreAway')),
         ]);
-        const homeBoxData = boxHomeSnap.docs.map((d) => ({
-          name: d.id,
-          ...d.data(),
-        })) as BoxScorePlayer[];
-        const awayBoxData = boxAwaySnap.docs.map((d) => ({
-          name: d.id,
-          ...d.data(),
+
+        // Map box score data to BoxScorePlayer array for home team
+        const homeBoxScoreData = homeBoxScoreSnapshot.docs.map((docSnapshot) => ({
+          name: docSnapshot.id,
+          ...docSnapshot.data(),
         })) as BoxScorePlayer[];
 
-        async function buildRows(
-          teamRef: any,
-          boxData: BoxScorePlayer[]
+        // Map box score data to BoxScorePlayer array for away team
+        const awayBoxScoreData = awayBoxScoreSnapshot.docs.map((docSnapshot) => ({
+          name: docSnapshot.id,
+          ...docSnapshot.data(),
+        })) as BoxScorePlayer[];
+
+        // Function to build box score rows by fetching additional player details
+        async function buildBoxScoreRows(
+          teamDocumentRef: any,
+          boxScoreData: BoxScorePlayer[]
         ): Promise<BoxScoreRow[]> {
-          if (!teamRef) {
-            return boxData.map((b) => computeStats({ ...b }));
+          if (!teamDocumentRef) {
+            // If team reference is not available, compute stats without additional data
+            return boxScoreData.map((player) => computePlayerStats({ ...player }));
           }
-          const playersColl = collection(teamRef, 'players');
-          const rows: BoxScoreRow[] = [];
 
-          for (const b of boxData) {
-            const normName = normalizeID(b.name);
-            const pSnap = await getDoc(doc(playersColl, normName));
-            let pDoc: PlayerDoc = {};
-            if (pSnap.exists()) pDoc = pSnap.data() as PlayerDoc;
+          const playersCollectionRef = collection(teamDocumentRef, 'players'); // Reference to players subcollection
+          const boxScoreRows: BoxScoreRow[] = [];
 
-            const row: BoxScoreRow = {
-              ...b,
-              shirtNumber: pDoc.shirtNumber,
-              position: pDoc.position,
+          // Iterate through each player in boxScoreData
+          for (const boxScorePlayer of boxScoreData) {
+            const normalizedPlayerName = normalizeID(boxScorePlayer.name); // Normalize player name
+            const playerDocumentSnapshot = await getDoc(doc(playersCollectionRef, normalizedPlayerName)); // Fetch player document
+            let playerDetails: PlayerDoc = {};
+            if (playerDocumentSnapshot.exists()) playerDetails = playerDocumentSnapshot.data() as PlayerDoc;
+
+            // Combine box score data with player document data
+            const boxScoreRow: BoxScoreRow = {
+              ...boxScorePlayer,
+              shirtNumber: playerDetails.shirtNumber,
+              position: playerDetails.position,
             };
-            rows.push(computeStats(row));
+            boxScoreRows.push(computePlayerStats(boxScoreRow)); // Compute additional stats and add to rows
           }
-          return rows;
+          return boxScoreRows;
         }
 
-        const builtHome = await buildRows(homeTeamRef, homeBoxData);
-        const builtAway = await buildRows(awayTeamRef, awayBoxData);
+        // Build box score rows for home and away teams
+        const processedHomeBoxScoreRows = await buildBoxScoreRows(homeTeamDocumentRef, homeBoxScoreData);
+        const processedAwayBoxScoreRows = await buildBoxScoreRows(awayTeamDocumentRef, awayBoxScoreData);
 
-        // Sort: starters first, by shirtNumber ascending
-        function customSort(a: BoxScoreRow, b: BoxScoreRow) {
-          const sA = a.isStarter ? 0 : 1;
-          const sB = b.isStarter ? 0 : 1;
-          if (sA !== sB) return sA - sB;
-          const nA = a.shirtNumber ?? 9999;
-          const nB = b.shirtNumber ?? 9999;
-          return nA - nB;
+        // Custom sort function: starters first, then by shirt number ascending
+        function sortBoxScoreRows(firstPlayer: BoxScoreRow, secondPlayer: BoxScoreRow) {
+          const firstPlayerStarter = firstPlayer.isStarter ? 0 : 1;
+          const secondPlayerStarter = secondPlayer.isStarter ? 0 : 1;
+          if (firstPlayerStarter !== secondPlayerStarter) return firstPlayerStarter - secondPlayerStarter; // Sort starters before non-starters
+          const firstPlayerShirtNumber = firstPlayer.shirtNumber ?? 9999; // Default shirt number if not available
+          const secondPlayerShirtNumber = secondPlayer.shirtNumber ?? 9999;
+          return firstPlayerShirtNumber - secondPlayerShirtNumber; // Sort by shirt number
         }
-        builtHome.sort(customSort);
-        builtAway.sort(customSort);
 
-        setHomeRows(builtHome);
-        setAwayRows(builtAway);
+        processedHomeBoxScoreRows.sort(sortBoxScoreRows); // Sort home team rows
+        processedAwayBoxScoreRows.sort(sortBoxScoreRows); // Sort away team rows
 
-      } catch (err) {
-        console.error('Error fetching data:', err);
+        setHomeBoxScoreRows(processedHomeBoxScoreRows); // Set home team box score rows
+        setAwayBoxScoreRows(processedAwayBoxScoreRows); // Set away team box score rows
+
+      } catch (error) {
+        console.error('Error fetching data:', error); // Log any errors
       } finally {
-        setLoading(false);
+        setIsLoading(false); // Stop loading
       }
     };
 
-    fetchData();
-  }, [gameID]);
+    fetchGameData(); // Invoke the data fetching function
+  }, [gameID]); // Dependency array ensures fetchGameData runs when gameID changes
 
-  function computeStats(row: BoxScoreRow): BoxScoreRow {
-    const twoPM = row['2PM'] ?? 0;
-    const twoPA = row['2PA'] ?? 0;
-    const threePM = row['3PM'] ?? 0;
-    const threePA = row['3PA'] ?? 0;
-    const ftm = row.FTM ?? 0;
-    const fta = row.FTA ?? 0;
+  // Function to compute additional statistics for a box score row
+  function computePlayerStats(boxScoreRow: BoxScoreRow): BoxScoreRow {
+    const twoPointMade = boxScoreRow['2PM'] ?? 0;
+    const twoPointAttempted = boxScoreRow['2PA'] ?? 0;
+    const threePointMade = boxScoreRow['3PM'] ?? 0;
+    const threePointAttempted = boxScoreRow['3PA'] ?? 0;
+    const freeThrowsMade = boxScoreRow.FTM ?? 0;
+    const freeThrowsAttempted = boxScoreRow.FTA ?? 0;
 
-    const FG = twoPM + threePM;
-    const FGA = twoPA + threePA;
+    const totalFieldGoalsMade = twoPointMade + threePointMade; // Total field goals made
+    const totalFieldGoalsAttempted = twoPointAttempted + threePointAttempted; // Total field goals attempted
 
-    let FGpct = '-';
-    if (FGA > 0) FGpct = `${Math.round((FG / FGA) * 100)}%`;
+    let fieldGoalPercentage = '-';
+    if (totalFieldGoalsAttempted > 0) fieldGoalPercentage = `${Math.round((totalFieldGoalsMade / totalFieldGoalsAttempted) * 100)}%`; // Calculate FG%
 
-    let twoPTpct = '-';
-    if (twoPA > 0) twoPTpct = `${Math.round((twoPM / twoPA) * 100)}%`;
+    let twoPointPercentage = '-';
+    if (twoPointAttempted > 0) twoPointPercentage = `${Math.round((twoPointMade / twoPointAttempted) * 100)}%`; // Calculate 2PT%
 
-    let threePTpct = '-';
-    if (threePA > 0) threePTpct = `${Math.round((threePM / threePA) * 100)}%`;
+    let threePointPercentage = '-';
+    if (threePointAttempted > 0) threePointPercentage = `${Math.round((threePointMade / threePointAttempted) * 100)}%`; // Calculate 3PT%
 
-    let FTpct = '-';
-    if (fta > 0) FTpct = `${Math.round((ftm / fta) * 100)}%`;
+    let freeThrowPercentage = '-';
+    if (freeThrowsAttempted > 0) freeThrowPercentage = `${Math.round((freeThrowsMade / freeThrowsAttempted) * 100)}%`; // Calculate FT%
 
-    const off = row.OFFREB ?? 0;
-    const def = row.DEFFREB ?? 0;
-    const REB = off + def;
+    const offensiveRebounds = boxScoreRow.OFFREB ?? 0;
+    const defensiveRebounds = boxScoreRow.DEFFREB ?? 0;
+    const totalRebounds = offensiveRebounds + defensiveRebounds; // Total rebounds
 
     return {
-      ...row,
-      FG,
-      FGA,
-      FGpct,
-      twoPTpct,
-      threePTpct,
-      FTpct,
-      REB,
+      ...boxScoreRow,
+      FG: totalFieldGoalsMade,
+      FGA: totalFieldGoalsAttempted,
+      FGpct: fieldGoalPercentage,
+      twoPTpct: twoPointPercentage,
+      threePTpct: threePointPercentage,
+      FTpct: freeThrowPercentage,
+      REB: totalRebounds,
     };
   }
 
-  if (loading) {
+  // Render loading indicator while data is being fetched
+  if (isLoading) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" />
       </View>
     );
   }
-  if (!gameDetail) {
+
+  // Render message if game details are not found
+  if (!gameDetails) {
     return (
       <View style={styles.centered}>
         <Text>No details found for Game ID: {gameID}</Text>
@@ -271,8 +309,10 @@ export default function GameDetailsScreen() {
     );
   }
 
-  function renderBoxScore(teamName: string, rows: BoxScoreRow[]) {
-    if (rows.length === 0) {
+  // Function to render the box score table for a team
+  function renderBoxScore(teamName: string, boxScoreRows: BoxScoreRow[]) {
+    if (boxScoreRows.length === 0) {
+      // If no box score data is available
       return (
         <View style={styles.boxScoreContainer}>
           <Text style={styles.tableTitle}>{teamName} Box Score</Text>
@@ -281,7 +321,8 @@ export default function GameDetailsScreen() {
       );
     }
 
-    const firstBenchIndex = rows.findIndex((r) => !r.isStarter);
+    // Find the index where bench players start to insert a separator
+    const firstBenchPlayerIndex = boxScoreRows.findIndex((player) => !player.isStarter);
 
     return (
       <View style={styles.boxScoreContainer}>
@@ -293,57 +334,64 @@ export default function GameDetailsScreen() {
           showsHorizontalScrollIndicator
         >
           <View>
+            {/* Header row for the box score table */}
             <View style={[styles.row, styles.headerRow]}>
               <Text style={[styles.headerCell, { width: 40 }]}>#</Text>
               <Text style={[styles.headerCell, { width: 120 }]}>Name</Text>
               <Text style={[styles.headerCell, { width: 60 }]}>Pos</Text>
-              {STAT_COLUMNS.map((col) => (
+              {STAT_COLUMNS.map((statColumn) => (
                 <Text
-                  key={col.key}
-                  style={[styles.headerCell, { width: col.width }]}
+                  key={statColumn.key}
+                  style={[styles.headerCell, { width: statColumn.width }]}
                 >
-                  {col.label}
+                  {statColumn.label}
                 </Text>
               ))}
             </View>
 
-            {rows.map((r, index) => {
-              const isSeparator = index === firstBenchIndex && firstBenchIndex > 0;
+            {/* Render each player's statistics */}
+            {boxScoreRows.map((playerRow, index) => {
+              const isSeparator = index === firstBenchPlayerIndex && firstBenchPlayerIndex > 0;
 
-              const displayName = r.isCaptain ? `${r.name} (C)` : r.name;
+              // Display captain designation if applicable
+              const displayPlayerName = playerRow.isCaptain ? `${playerRow.name} (C)` : playerRow.name;
 
               return (
                 <View
-                  key={`${r.name}-${index}`}
+                  key={`${playerRow.name}-${index}`}
                   style={[
                     styles.row,
-                    isSeparator && styles.starterSeparator,
+                    isSeparator && styles.starterSeparator, // Add separator if it's the first bench player
                   ]}
                 >
+                  {/* Shirt number */}
                   <Text style={[styles.cell, { width: 40 }]}>
-                    {r.shirtNumber ?? '-'}
+                    {playerRow.shirtNumber ?? '-'}
                   </Text>
 
+                  {/* Player name with potential line wrapping */}
                   <Text
                     style={[styles.cell, { width: 120, flexWrap: 'wrap' }]}
                     numberOfLines={4}
                     ellipsizeMode="clip"
                   >
-                    {displayName}
+                    {displayPlayerName}
                   </Text>
 
+                  {/* Player position */}
                   <Text style={[styles.cell, { width: 60 }]}>
-                    {r.position ?? '-'}
+                    {playerRow.position ?? '-'}
                   </Text>
 
-                  {STAT_COLUMNS.map((col) => {
-                    const val = (r as any)[col.key] ?? '-';
+                  {/* Render each statistical column */}
+                  {STAT_COLUMNS.map((statColumn) => {
+                    const statValue = (playerRow as any)[statColumn.key] ?? '-';
                     return (
                       <Text
-                        key={col.key}
-                        style={[styles.cell, { width: col.width }]}
+                        key={statColumn.key}
+                        style={[styles.cell, { width: statColumn.width }]}
                       >
-                        {val}
+                        {statValue}
                       </Text>
                     );
                   })}
@@ -356,44 +404,51 @@ export default function GameDetailsScreen() {
     );
   }
 
+  // Main render return
   return (
     <ScrollView style={styles.container}>
+      {/* Header displaying team icons, names, and final scores */}
       <View style={styles.scoreHeader}>
+        {/* Home team information */}
         <View style={styles.teamInfo}>
-          {homeTeamDoc?.icon ? (
-            <Image source={{ uri: homeTeamDoc.icon }} style={styles.teamIcon} />
+          {homeTeamDocument?.icon ? (
+            <Image source={{ uri: homeTeamDocument.icon }} style={styles.teamIcon} />
           ) : (
             <View style={[styles.teamIcon, { backgroundColor: '#ccc' }]} />
           )}
           <Text style={styles.teamName}>
-            {homeTeamDoc?.teamName ?? gameDetail.homeTeam}
+            {homeTeamDocument?.teamName ?? gameDetails.homeTeam}
           </Text>
         </View>
 
-        <Text style={styles.scoreText}>{gameDetail.finalPointsHome}</Text>
+        {/* Final points for home and away teams */}
+        <Text style={styles.scoreText}>{gameDetails.finalPointsHome}</Text>
         <Text style={styles.scoreDivider}> - </Text>
-        <Text style={styles.scoreText}>{gameDetail.finalPointsAway}</Text>
+        <Text style={styles.scoreText}>{gameDetails.finalPointsAway}</Text>
 
+        {/* Away team information */}
         <View style={styles.teamInfo}>
-          {awayTeamDoc?.icon ? (
-            <Image source={{ uri: awayTeamDoc.icon }} style={styles.teamIcon} />
+          {awayTeamDocument?.icon ? (
+            <Image source={{ uri: awayTeamDocument.icon }} style={styles.teamIcon} />
           ) : (
             <View style={[styles.teamIcon, { backgroundColor: '#ccc' }]} />
           )}
           <Text style={styles.teamName}>
-            {awayTeamDoc?.teamName ?? gameDetail.awayTeam}
+            {awayTeamDocument?.teamName ?? gameDetails.awayTeam}
           </Text>
         </View>
       </View>
 
+      {/* Render box score for home team */}
       {renderBoxScore(
-        homeTeamDoc?.teamName ?? 'Home Team',
-        homeRows
+        homeTeamDocument?.teamName ?? 'Home Team',
+        homeBoxScoreRows
       )}
 
+      {/* Render box score for away team */}
       {renderBoxScore(
-        awayTeamDoc?.teamName ?? 'Away Team',
-        awayRows
+        awayTeamDocument?.teamName ?? 'Away Team',
+        awayBoxScoreRows
       )}
 
     </ScrollView>
