@@ -1,50 +1,49 @@
-# Welcome to your Expo app 👋
+Creation Of The Regional Basketball League (RKL) Mobile Application
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Team:
+Eitvidas Šemežys (Fontys ICT Student)
+Lukas Rutkauskas (RKL Media Manager)
 
-## Get started
+Introduction:
+Regional Basketball League (RKL) is the third strongest basketball league in Lithuania. Since
+Remigijus Kuodis has become the director of the league in 2022, the league has been
+increasingly growing in popularity due to their innovations and marketing.
+Client:
 
-1. Install dependencies
+Regionų Krepšinio Lyga (EN.: Regional Basketball League)
+Target From The Client:
 
-   ```bash
-   npm install
-   ```
+Mobile application that features all (or most) of the information that is available in their Website
+(https://www.rkl.lt/) made from A to Z.
 
-2. Start the app
+Problems:
+• Currently, there is no mobile application, or concept existing.
 
-   ```bash
-    npx expo start
-   ```
+Restrictions:
+• Time restraint from school.
 
-In the output, you'll find options to open the app in a
+Similar Products:
+• Nederlandse Basketball Bond (Netherlands Basketball Bond) has a mobile application
+that is the primary source of their information all means basketball, since I use it daily, I
+know what limitations it has and what I could improve on taking inspiration out of this
+application to make a better one for RKL. It is an account-based application that gives
+personalised data to the user. While I do like the idea of personalised content and an
+account based system, for RKL, I believe it is simply not the right approach because it is
+more of a professional league rather than an organisation containing all basketball in the
+country. I am going to include a lot of information in a neat and organised manner. See
+more information about my approach and functionalities in the Software Design
+Document.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+Scope:
+• Since it is a personal passion project, I do take my own personal time that is not
+supposed to be allocated for school to continue working on this project overtime.
+Because of this, I have already made everything I had in scope for the sprint (news tab
+which was mentioned to be the end goal at first). Therefore, I will be creating the full
+application, or at least try to, before the end of the semester, I will go downwards in the
+MoSCoW table from must to could to would and so on so I firstly will have all the
+essentials. I will not focus on UI/UX apart from the mandatory of course, since that is
+what is going to be the goal for me for the next semester.
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Resources:
+• RKL website
+• Communication for feedback available from RKL Media Manager and Director.
