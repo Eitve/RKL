@@ -1,3 +1,4 @@
+import { Timestamp } from 'firebase/firestore';
 
 // Function to remove Lithuanian characters and make all lowercase
 export function normalizeID(input: string): string {
@@ -58,4 +59,25 @@ export function normalizeID(input: string): string {
       REB: totalRebounds,
     };
   }
+
+// Function to format game dates
+  export function formatGameDate(dateInput: Timestamp | string | Date): { dateObj: Date; dateStr: string } {
+    let dateObj: Date;
+   if (dateInput instanceof Timestamp) {
+      dateObj = dateInput.toDate();
+   } else if (typeof dateInput === 'string') {
+     dateObj = new Date(dateInput);
+   } else {
+     dateObj = dateInput;
+   }
+
+  const datePart = dateObj.toLocaleDateString();
+  const timePart = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return { dateObj, dateStr: `${datePart} ${timePart}` };
+}
+
+// Function to determine if a game belongs to the selected division
+  export function isDivisionMatch(gameDivision: 'A' | 'B', isDivisionBSelected: boolean): boolean {
+    return gameDivision === (isDivisionBSelected ? 'B' : 'A');
+}
   

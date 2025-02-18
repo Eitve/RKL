@@ -1,34 +1,17 @@
+// /src/screens/ScheduleScreen.tsx
+
 import React, { useState, useEffect } from 'react';
-import { SafeAreaView, View, Text, Image, FlatList, StyleSheet, Switch, TouchableOpacity, } from 'react-native';
+import { SafeAreaView, View, Text, FlatList, Switch } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { collection, getDocs } from 'firebase/firestore';
 import { firestore } from '../firebaseConfig';
-import { collection, getDocs, Timestamp } from 'firebase/firestore';
 import { ScheduleStackParamList } from './_layout';
-
-type GameProps = {
-  gameID: number;
-  homeTeam: string;
-  awayTeam: string;
-  finalPointsHome: number | null;
-  finalPointsAway: number | null;
-  division: 'A' | 'B';
-};
-
-type ScheduledGameProps = {
-  homeTeam: string;
-  awayTeam: string;
-  division: 'A' | 'B';
-  arena?: string;
-  dateObj: Date;
-  dateStr: string;
-};
-
-type TeamProps = {
-  id: string;
-  name: string;
-  icon: string;
-};
+import CompletedGameItem from '../../components/CompletedGameItem';
+import ScheduledGameItem from '../../components/ScheduledGameItem';
+import { GameProps, ScheduledGameProps, TeamProps } from '../../types';
+import { formatGameDate, isDivisionMatch } from '../../components/gameUtils';
+import styles from '../Styles/ScheduleStyles';
 
 type ScheduleScreenNavigationProp = NativeStackNavigationProp<
   ScheduleStackParamList,
@@ -49,6 +32,7 @@ const ScheduleScreen = () => {
       try {
         setLoading(true);
 
+        // Fetch teams
         const teamsSnap = await getDocs(collection(firestore, 'teams'));
         const teamMap = new Map<string, TeamProps>();
         teamsSnap.docs.forEach((doc) => {
@@ -61,6 +45,7 @@ const ScheduleScreen = () => {
         });
         setTeams(teamMap);
 
+        // Fetch completed games
         const gamesSnap = await getDocs(collection(firestore, 'games'));
         const completedGames: GameProps[] = gamesSnap.docs.map((doc) => {
           const data = doc.data() as any;
@@ -75,24 +60,12 @@ const ScheduleScreen = () => {
         });
         setGames(completedGames);
 
+        // Fetch scheduled games
         const scheduledSnap = await getDocs(collection(firestore, 'scheduledGames'));
         const upcoming: ScheduledGameProps[] = [];
         scheduledSnap.docs.forEach((doc) => {
           const data = doc.data() as any;
-          let dateObj = new Date();
-          if (data.gameDate instanceof Timestamp) {
-            dateObj = data.gameDate.toDate();
-          } else if (typeof data.gameDate === 'string') {
-            dateObj = new Date(data.gameDate);
-          }
-
-          const datePart = dateObj.toLocaleDateString();
-          const timePart = dateObj.toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-          });
-          const dateStr = `${datePart} ${timePart}`;
-
+          const { dateObj, dateStr } = formatGameDate(data.gameDate);
           upcoming.push({
             homeTeam: data.homeTeam || '',
             awayTeam: data.awayTeam || '',
@@ -113,18 +86,16 @@ const ScheduleScreen = () => {
     fetchData();
   }, []);
 
-  const isDivisionMatch = (division: 'A' | 'B') =>
-    division === (isDivisionB ? 'B' : 'A');
-
+  // Filter completed games and scheduled games based on division
   const filteredResults = games.filter(
     (g) =>
-      isDivisionMatch(g.division) &&
+      isDivisionMatch(g.division, isDivisionB) &&
       g.finalPointsHome !== null &&
       g.finalPointsAway !== null
   );
 
   const filteredSchedule = scheduledGames.filter((sg) =>
-    isDivisionMatch(sg.division)
+    isDivisionMatch(sg.division, isDivisionB)
   );
 
   const handleGamePress = (game: GameProps) => {
@@ -132,10 +103,10 @@ const ScheduleScreen = () => {
   };
 
   const renderCompletedGame = ({ item }: { item: GameProps }) => {
-    const homeTeamDoc = teams.get(item.homeTeam);
-    const awayTeamDoc = teams.get(item.awayTeam);
+    const homeTeam = teams.get(item.homeTeam);
+    const awayTeam = teams.get(item.awayTeam);
 
-    if (!homeTeamDoc || !awayTeamDoc) {
+    if (!homeTeam || !awayTeam) {
       return (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>
@@ -146,58 +117,24 @@ const ScheduleScreen = () => {
     }
 
     return (
-      <TouchableOpacity style={styles.gameContainer} onPress={() => handleGamePress(item)}>
-        <View style={styles.teamRow}>
-          <View style={styles.teamInfo}>
-            <Image source={{ uri: homeTeamDoc.icon }} style={styles.teamIconResults} />
-            <Text style={styles.teamName}>{homeTeamDoc.name}</Text>
-          </View>
-          <Text style={styles.teamPoints}>{item.finalPointsHome ?? '-'}</Text>
-        </View>
-        <View style={styles.teamRow}>
-          <View style={styles.teamInfo}>
-            <Image source={{ uri: awayTeamDoc.icon }} style={styles.teamIconResults} />
-            <Text style={styles.teamName}>{awayTeamDoc.name}</Text>
-          </View>
-          <Text style={styles.teamPoints}>{item.finalPointsAway ?? '-'}</Text>
-        </View>
-      </TouchableOpacity>
+      <CompletedGameItem
+        game={item}
+        homeTeam={homeTeam}
+        awayTeam={awayTeam}
+        onPress={handleGamePress}
+      />
     );
   };
 
   const renderScheduledGame = ({ item }: { item: ScheduledGameProps }) => {
-    const homeTeamDoc = teams.get(item.homeTeam);
-    const awayTeamDoc = teams.get(item.awayTeam);
-
+    const homeTeam = teams.get(item.homeTeam);
+    const awayTeam = teams.get(item.awayTeam);
     return (
-      <View style={styles.gameContainer}>
-        <View style={styles.teamRow}>
-          <Image
-            source={{ uri: homeTeamDoc?.icon || '' }}
-            style={styles.teamIconScheduled}
-          />
-          <Text style={styles.teamName}>{homeTeamDoc?.name || item.homeTeam}</Text>
-        </View>
-
-        <View style={styles.vsContainer}>
-          <Text style={styles.vsText}>vs</Text>
-        </View>
-
-        <View style={styles.teamRow}>
-          <Image
-            source={{ uri: awayTeamDoc?.icon || '' }}
-            style={styles.teamIconScheduled}
-          />
-          <Text style={styles.teamName}>{awayTeamDoc?.name || item.awayTeam}</Text>
-        </View>
-
-        <View style={styles.bottomRow}>
-          <Text style={styles.arenaText}>
-            {item.arena ? `Arena: ${item.arena}` : ''}
-          </Text>
-          <Text style={styles.gameDateText}>{item.dateStr}</Text>
-        </View>
-      </View>
+      <ScheduledGameItem
+        scheduledGame={item}
+        homeTeam={homeTeam}
+        awayTeam={awayTeam}
+      />
     );
   };
 
@@ -243,103 +180,3 @@ const ScheduleScreen = () => {
 };
 
 export default ScheduleScreen;
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 10,
-    backgroundColor: '#fff',
-  },
-  switchRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginVertical: 10,
-  },
-  switchLabel: {
-    fontSize: 16,
-    marginHorizontal: 5,
-  },
-  switch: {
-    marginHorizontal: 10,
-  },
-  loadingText: {
-    textAlign: 'center',
-    fontSize: 16,
-    marginTop: 20,
-  },
-  gameContainer: {
-    padding: 10,
-    marginVertical: 5,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 5,
-    backgroundColor: '#f9f9f9',
-  },
-  teamRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 4,
-    justifyContent: 'space-between',
-  },
-  bottomRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 6,
-  },
-  teamInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  teamIconResults: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 8,
-  },
-  teamIconScheduled: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 8,
-  },
-  teamName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-
-  vsContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 4,
-  },
-  vsText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-
-  gameDateText: {
-    fontSize: 14,
-    color: '#555',
-  },
-  arenaText: {
-    fontSize: 14,
-    color: '#555',
-    maxWidth: '65%',
-  },
-  teamPoints: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#007bff',
-  },
-  errorContainer: {
-    padding: 10,
-    alignItems: 'center',
-  },
-  errorText: {
-    color: 'red',
-    fontSize: 14,
-  },
-});
