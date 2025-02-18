@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { STAT_COLUMNS } from '../constants/STAT_COLUMNS'; // or wherever STAT_COLUMNS is defined
 
 interface BoxScoreRowProps {
   shirtNumber?: number;
@@ -48,13 +49,13 @@ const BoxScoreRow: React.FC<BoxScoreRowProps> = ({
         {position ?? '-'}
       </Text>
 
-      {/* Render each statistical column */}
-      {Object.entries(stats).map(([key, value]) => (
+      {/* Render each statistical column using STAT_COLUMNS for consistent order */}
+      {STAT_COLUMNS.map((col) => (
         <Text
-          key={key}
-          style={[styles.cell, { width: 50 }]} // Assuming all STAT_COLUMNS have width 50
+          key={col.key}
+          style={[styles.cell, { width: col.width }]}
         >
-          {value ?? '-'}
+          {stats[col.key] ?? '-'}
         </Text>
       ))}
     </View>
