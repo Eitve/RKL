@@ -6,14 +6,8 @@ import NewsContainer from '../../components/NewsContainer';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../types';
+import { NewsItem } from '../../types'
 
-interface NewsItem {
-  id: string;
-  title: string;
-  content: string;
-  imageURL: string;
-  number: number;
-}
 
 const IndexScreen = () => {
   const [newsData, setNewsData] = useState<NewsItem[]>([]);

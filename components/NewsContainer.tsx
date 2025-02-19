@@ -1,4 +1,3 @@
-// NewsContainer.tsx
 import React from 'react';
 import { View, Text, ImageBackground, TouchableOpacity, StyleSheet } from 'react-native';
 
@@ -6,7 +5,7 @@ interface NewsContainerProps {
   title: string;
   content: string;
   imageURL: string;
-  number: number; // Add number prop
+  number: number;
   onPress: () => void;
 }
 
@@ -37,7 +36,7 @@ const styles = StyleSheet.create({
   },
   number: {
     fontSize: 16,
-    color: '#fff', // White text for visibility
+    color: '#fff',
     fontWeight: 'bold',
   },
   title: {
