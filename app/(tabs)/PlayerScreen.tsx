@@ -1,56 +1,18 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, Image, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, ActivityIndicator,} from 'react-native';
+import { SafeAreaView, FlatList, ActivityIndicator, View, Text, StyleSheet, } from 'react-native';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { firestore } from '../firebaseConfig';
-import { doc, getDoc, collection, getDocs, query, where,} from 'firebase/firestore';
-
+import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { formatMinutes } from '../../components/gameUtils';
 import { StatisticsStackParamList } from './_layout';
+import PlayerProfile from '../../components/PlayerProfile';
+import GameRow from '../../components/GameRow';
+import { PlayerDoc, GameStats } from '../../types';
+import styles from '../Styles/PlayerScreenStyles'
 
 type PlayerScreenRouteProp = RouteProp<StatisticsStackParamList, 'PlayerScreen'>;
-type PlayerScreenNavProp = NativeStackNavigationProp<
-  StatisticsStackParamList,
-  'PlayerScreen'
->;
-
-interface PlayerDoc {
-  firstName?: string;
-  lastName?: string;
-  dob?: string;
-  age?: number;
-  nationality?: string;
-  height?: number;
-  weight?: number;
-  photoURL?: string;
-  shirtNumber?: number;
-  position?: string;
-  avgPTS?: number;
-  avgREB?: number;
-  avgAST?: number;
-  avgSTL?: number;
-  avgBLK?: number;
-  avgSecs?: number;
-  gamesPlayed?: number;
-}
-
-interface GameStats {
-  gameID: string;
-  finalScore: string;
-  opponentTeamName: string; 
-  isWin: boolean;
-  points: number;
-  rebounds: number;
-  assists: number;
-  steals: number;
-  blocks: number;
-  minutes: string;
-}
-
-function formatMinutes(totalSeconds: number): string {
-  const mins = Math.floor(totalSeconds / 60);
-  const secs = totalSeconds % 60;
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
+type PlayerScreenNavProp = NativeStackNavigationProp<StatisticsStackParamList, 'PlayerScreen'>;
 
 const PlayerScreen: React.FC = () => {
   const route = useRoute<PlayerScreenRouteProp>();
@@ -67,12 +29,14 @@ const PlayerScreen: React.FC = () => {
       try {
         setLoading(true);
 
+        // Fetch player data
         const playerRef = doc(firestore, `teams/${teamID}/players`, playerID);
         const playerSnap = await getDoc(playerRef);
         if (playerSnap.exists()) {
           setPlayer(playerSnap.data() as PlayerDoc);
         }
 
+        // Fetch all games
         const gamesSnap = await getDocs(collection(firestore, 'games'));
         const statsArray: GameStats[] = [];
 
@@ -88,11 +52,11 @@ const PlayerScreen: React.FC = () => {
           if (!isHome && !isAway) continue;
 
           const finalScore = `${homeScore}-${awayScore}`;
-
-          const isWin = (isHome && homeScore > awayScore) || (isAway && awayScore > homeScore);
-
+          const isWin =
+            (isHome && homeScore > awayScore) || (isAway && awayScore > homeScore);
           const opponentID = isHome ? awayTeamID : homeTeamID;
 
+          // Get opponent team name
           let opponentTeamName = opponentID;
           const teamsRef = collection(firestore, 'teams');
           const oppQ = query(teamsRef, where('teamID', '==', opponentID));
@@ -102,8 +66,11 @@ const PlayerScreen: React.FC = () => {
             opponentTeamName = oppDocData.teamName || opponentID;
           }
 
+          // Fetch box score data
           const boxCollName = isHome ? 'BoxScoreHome' : 'BoxScoreAway';
-          const boxSnap = await getDocs(collection(firestore, `games/${gDoc.id}/${boxCollName}`));
+          const boxSnap = await getDocs(
+            collection(firestore, `games/${gDoc.id}/${boxCollName}`)
+          );
 
           let foundBox: any = null;
           if (playerSnap.exists()) {
@@ -158,7 +125,6 @@ const PlayerScreen: React.FC = () => {
     [navigation]
   );
 
-
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -180,66 +146,9 @@ const PlayerScreen: React.FC = () => {
     );
   }
 
-  const renderGameRow = ({ item }: { item: GameStats }) => {
-    const resultColor = item.isWin ? 'green' : 'red';
-    const resultLabel = item.isWin ? 'W' : 'L';
-
-    return (
-      <TouchableOpacity onPress={() => handleGamePress(item.gameID)} style={styles.gameRow}>
-        <Text style={styles.opponentLine}>
-          <Text style={styles.bold}>{item.opponentTeamName}</Text>{' '}
-          <Text>{item.finalScore}</Text>{'  '}
-          <Text style={[styles.bold, { color: resultColor }]}>{resultLabel}</Text>
-        </Text>
-        <Text style={styles.statsLine}>
-          PTS: {item.points}, REB: {item.rebounds}, AST: {item.assists},
-          {'  '}STL: {item.steals}, BLK: {item.blocks}, MINS: {item.minutes}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
-
-  const renderListHeader = () => {
-    return (
-      <View>
-        <View style={styles.topSection}>
-          {player.photoURL ? (
-            <Image source={{ uri: player.photoURL }} style={styles.playerPhoto} />
-          ) : (
-            <View style={[styles.playerPhoto, { backgroundColor: '#ccc' }]} />
-          )}
-          <View style={styles.bioContainer}>
-            <Text style={styles.playerName}>
-              {player.firstName} {player.lastName}
-            </Text>
-            {player.dob && <Text>DOB: {player.dob}</Text>}
-            {player.age && <Text>Age: {player.age}</Text>}
-            {player.height && <Text>Height: {player.height} cm</Text>}
-            {player.weight && <Text>Weight: {player.weight} kg</Text>}
-          </View>
-        </View>
-
-        <View style={styles.overallStatsSection}>
-          <Text style={styles.sectionTitle}>Overall Stats</Text>
-          {player.gamesPlayed ? (
-            <>
-              <Text>Games Played: {player.gamesPlayed}</Text>
-              <Text>Avg PTS: {player.avgPTS?.toFixed(1)}</Text>
-              <Text>Avg REB: {player.avgREB?.toFixed(1)}</Text>
-              <Text>Avg AST: {player.avgAST?.toFixed(1)}</Text>
-              <Text>Avg STL: {player.avgSTL?.toFixed(1)}</Text>
-              <Text>Avg BLK: {player.avgBLK?.toFixed(1)}</Text>
-              <Text>Avg Mins: {formatMinutes(player.avgSecs || 0)}</Text>
-            </>
-          ) : (
-            <Text>No stats available for this player.</Text>
-          )}
-        </View>
-
-        <Text style={styles.sectionTitle}>Game by Game Stats</Text>
-      </View>
-    );
-  };
+  const renderGameRow = ({ item }: { item: GameStats }) => (
+    <GameRow game={item} onPress={handleGamePress} />
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -247,7 +156,12 @@ const PlayerScreen: React.FC = () => {
         data={gameStats}
         keyExtractor={(item) => item.gameID}
         renderItem={renderGameRow}
-        ListHeaderComponent={renderListHeader}
+        ListHeaderComponent={() => (
+          <>
+            <PlayerProfile player={player} />
+            <Text style={styles.sectionTitle}>Game by Game Stats</Text>
+          </>
+        )}
         contentContainerStyle={{ paddingBottom: 20 }}
       />
     </SafeAreaView>
@@ -256,62 +170,3 @@ const PlayerScreen: React.FC = () => {
 
 export default PlayerScreen;
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  topSection: {
-    flexDirection: 'row',
-    padding: 16,
-  },
-  playerPhoto: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-  },
-  bioContainer: {
-    marginLeft: 16,
-    flex: 1,
-  },
-  playerName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 6,
-  },
-
-  overallStatsSection: {
-    paddingHorizontal: 16,
-    paddingBottom: 10,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginVertical: 8,
-    marginLeft: 16,
-  },
-
-  gameRow: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
-  },
-  opponentLine: {
-    marginBottom: 2,
-    fontSize: 14,
-  },
-  statsLine: {
-    fontSize: 14,
-    color: '#555',
-  },
-  bold: {
-    fontWeight: '600',
-  },
-});
