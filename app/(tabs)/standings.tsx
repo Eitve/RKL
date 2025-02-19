@@ -1,40 +1,16 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import {SafeAreaView, View, Text, Image, FlatList, ActivityIndicator, Pressable, StyleSheet, Switch, } from 'react-native';
+import { SafeAreaView, View, Text, ActivityIndicator, Switch, StyleSheet, } from 'react-native';
 import { firestore } from '../firebaseConfig';
 import { collection, getDocs } from 'firebase/firestore';
 import { useNavigation } from '@react-navigation/native';
-
-type TeamProps = {
-  docID: string;
-  teamName?: string;
-  icon?: string;
-  division?: string;
-  gamesPlayed?: number;
-  wins?: number;
-  losses?: number;
-  ptsMinus?: number;
-  ptsPlus?: number;
-  ptsDifference?: number;
-  standingPoints?: number;
-};
-
-type GameProps = {
-  gameID?: number;
-  homeTeam?: string;
-  awayTeam?: string;
-  finalPointsHome?: number;
-  finalPointsAway?: number;
-  winner?: string;
-  loser?: string;
-};
+import { TeamProps, GameProps } from '../../types';
+import DivisionSelector, { Division } from '../../components/DivisionSelector';
+import StandingsTable from '../../components/StandingsTable';
+import { sortTeams, getPlaceTextColor } from '../../components/gameUtils';
+import styles from '../Styles/StandingsStyles'
 
 interface StandingsNavigationProp {
-  navigate: (
-    screen: string,
-    params?: {
-      teamName?: string;
-    }
-  ) => void;
+  navigate: (screen: string, params?: { teamName?: string }) => void;
 }
 
 const StandingsScreen: React.FC = () => {
@@ -42,7 +18,7 @@ const StandingsScreen: React.FC = () => {
   const [teams, setTeams] = useState<TeamProps[]>([]);
   const [games, setGames] = useState<GameProps[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDivision, setSelectedDivision] = useState<'A' | 'B-A' | 'B-B'>('A');
+  const [selectedDivision, setSelectedDivision] = useState<Division>('A');
   const [showDetails, setShowDetails] = useState(false);
 
   const fetchData = useCallback(async () => {
@@ -53,7 +29,7 @@ const StandingsScreen: React.FC = () => {
       const loadedTeams: TeamProps[] = teamsSnapshot.docs.map((doc) => {
         const data = doc.data() || {};
         return {
-          docID: doc.id,
+          id: doc.id,
           teamName: data.teamName,
           icon: data.icon,
           division: data.division,
@@ -76,6 +52,7 @@ const StandingsScreen: React.FC = () => {
           awayTeam: data.awayTeam,
           finalPointsHome: data.finalPointsHome,
           finalPointsAway: data.finalPointsAway,
+          division: data.division,
           winner: data.winner,
           loser: data.loser,
         };
@@ -83,7 +60,7 @@ const StandingsScreen: React.FC = () => {
 
       const teamMap = new Map<string, TeamProps>();
       loadedTeams.forEach((t) => {
-        teamMap.set(t.docID, t);
+        teamMap.set(t.id, t);
       });
 
       for (const g of loadedGames) {
@@ -129,36 +106,15 @@ const StandingsScreen: React.FC = () => {
     fetchData();
   }, [fetchData]);
 
-  const handleDivisionChange = (division: 'A' | 'B-A' | 'B-B') => {
+  const handleDivisionChange = (division: Division) => {
     setSelectedDivision(division);
   };
 
-  const sortTeams = (divisionTeams: TeamProps[]) => {
-    return [...divisionTeams].sort((a, b) => {
-      if ((b.standingPoints ?? 0) !== (a.standingPoints ?? 0)) {
-        return (b.standingPoints ?? 0) - (a.standingPoints ?? 0);
-      }
-      if ((b.ptsDifference ?? 0) !== (a.ptsDifference ?? 0)) {
-        return (b.ptsDifference ?? 0) - (a.ptsDifference ?? 0);
-      }
-      return (a.teamName ?? '').localeCompare(b.teamName ?? '');
-    });
+  const handleRowPress = (team: TeamProps) => {
+    navigation.navigate('TeamScreen', { teamName: team.id });
   };
 
-  const getPlaceTextColor = (place: number, division: string | undefined) => {
-    if (division === 'A') {
-      if (place >= 1 && place <= 4) return { color: 'green' };
-      if (place >= 5 && place <= 12) return { color: 'yellow' };
-      if (place === 13 || place === 14) return { color: 'black' };
-      if (place === 15 || place === 16) return { color: 'red' };
-    } else if (division?.startsWith('B')) {
-      if (place >= 1 && place <= 8) return { color: 'green' };
-      if (place >= 9 && place <= 13) return { color: 'black' };
-    }
-    return {};
-  };
-
-  const renderStandings = () => {
+  const renderContent = () => {
     if (loading) {
       return (
         <View style={styles.loadingContainer}>
@@ -170,234 +126,35 @@ const StandingsScreen: React.FC = () => {
 
     const divisionTeams = teams.filter((t) => t.division === selectedDivision);
     const rowsCount = selectedDivision === 'A' ? 16 : 13;
-    const sorted = sortTeams(divisionTeams);
+    const sortedTeams = sortTeams(divisionTeams);
     const tableRows = Array.from({ length: rowsCount }, (_, i) => {
-      const t = sorted[i];
+      const t = sortedTeams[i];
       return { place: i + 1, team: t };
     });
 
     return (
-      <View style={styles.tableContainer}>
-        <View style={[styles.tableRow, styles.tableHeader]}>
-          <Text style={[styles.headerCell, { flex: 0.5, textAlign: 'left' }]}>#</Text>
-          <Text style={[styles.headerCell, { flex: 2, textAlign: 'left' }]}>Team</Text>
-          <Text style={[styles.headerCell, { flex: 0.6, textAlign: 'right' }]}>GP</Text>
-          <Text style={[styles.headerCell, { flex: 0.6, textAlign: 'right' }]}>W</Text>
-          <Text style={[styles.headerCell, { flex: 0.6, textAlign: 'right' }]}>L</Text>
-          {showDetails && (
-            <>
-              <Text style={[styles.headerCell, { flex: 0.8, textAlign: 'right' }]}>Pts-</Text>
-              <Text style={[styles.headerCell, { flex: 0.8, textAlign: 'right' }]}>Pts+</Text>
-              <Text style={[styles.headerCell, { flex: 0.8, textAlign: 'right' }]}>Diff</Text>
-            </>
-          )}
-          <Text style={[styles.headerCell, { flex: 0.6, textAlign: 'right' }]}>P</Text>
-        </View>
-
-        <FlatList
-          data={tableRows}
-          keyExtractor={(item) => item.place.toString()}
-          renderItem={({ item }) => {
-            const { place, team } = item;
-            if (!team) {
-              return (
-                <View style={styles.tableRow}>
-                  <Text style={[styles.cellText, { flex: 0.5 }]}> {place}</Text>
-                  <Text style={[styles.cellText, { flex: 2 }]}>No Team</Text>
-                </View>
-              );
-            }
-            const colorStyle = getPlaceTextColor(place, team.division);
-            return (
-              <Pressable
-                style={styles.tableRow}
-                onPress={() => {
-                  navigation.navigate('TeamScreen', {
-                    teamName: team.docID,
-                  });
-                }}
-              >
-                <Text style={[styles.cellText, { flex: 0.5 }, colorStyle]}>{place}</Text>
-
-                <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center' }}>
-                  {team.icon ? (
-                    <Image source={{ uri: team.icon }} style={styles.teamIcon} />
-                  ) : (
-                    <View style={styles.placeholderIcon} />
-                  )}
-                  <Text
-                    style={[styles.cellText, styles.teamName]}
-                  >
-                    {team.teamName ?? 'Unnamed'}
-                  </Text>
-                </View>
-
-                <Text style={[styles.cellText, styles.numCell, { flex: 0.6 }]}>
-                  {team.gamesPlayed ?? 0}
-                </Text>
-                <Text style={[styles.cellText, styles.numCell, { flex: 0.6 }]}>
-                  {team.wins ?? 0}
-                </Text>
-                <Text style={[styles.cellText, styles.numCell, { flex: 0.6 }]}>
-                  {team.losses ?? 0}
-                </Text>
-
-                {showDetails && (
-                  <>
-                    <Text style={[styles.cellText, styles.numCell, { flex: 0.8 }]}>
-                      {team.ptsMinus ?? 0}
-                    </Text>
-                    <Text style={[styles.cellText, styles.numCell, { flex: 0.8 }]}>
-                      {team.ptsPlus ?? 0}
-                    </Text>
-                    <Text style={[styles.cellText, styles.numCell, { flex: 0.8 }]}>
-                      {team.ptsDifference ?? 0}
-                    </Text>
-                  </>
-                )}
-
-                <Text style={[styles.cellText, styles.numCell, { flex: 0.6 }]}>
-                  {team.standingPoints ?? 0}
-                </Text>
-              </Pressable>
-            );
-          }}
-        />
-      </View>
+      <StandingsTable
+        tableRows={tableRows}
+        showDetails={showDetails}
+        onRowPress={handleRowPress}
+        getPlaceTextColor={getPlaceTextColor}
+      />
     );
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.buttonContainer}>
-        <Pressable
-          style={[
-            styles.divisionButton,
-            selectedDivision === 'A' && styles.divisionButtonSelected,
-          ]}
-          onPress={() => handleDivisionChange('A')}
-        >
-          <Text style={styles.buttonText}>A Division</Text>
-        </Pressable>
-        <Pressable
-          style={[
-            styles.divisionButton,
-            selectedDivision === 'B-A' && styles.divisionButtonSelected,
-          ]}
-          onPress={() => handleDivisionChange('B-A')}
-        >
-          <Text style={styles.buttonText}>B Division-A</Text>
-        </Pressable>
-        <Pressable
-          style={[
-            styles.divisionButton,
-            selectedDivision === 'B-B' && styles.divisionButtonSelected,
-          ]}
-          onPress={() => handleDivisionChange('B-B')}
-        >
-          <Text style={styles.buttonText}>B Division-B</Text>
-        </Pressable>
-      </View>
-
+      <DivisionSelector
+        selectedDivision={selectedDivision}
+        onSelectDivision={handleDivisionChange}
+      />
       <View style={styles.switchContainer}>
         <Text style={styles.switchLabel}>Details</Text>
-        <Switch
-          value={showDetails}
-          onValueChange={(val) => setShowDetails(val)}
-        />
+        <Switch value={showDetails} onValueChange={(val) => setShowDetails(val)} />
       </View>
-
-      {renderStandings()}
+      {renderContent()}
     </SafeAreaView>
   );
 };
 
 export default StandingsScreen;
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 10,
-    backgroundColor: '#000',
-  },
-  divisionButton: {
-    padding: 10,
-    backgroundColor: '#ccc',
-    borderRadius: 5,
-  },
-  divisionButtonSelected: {
-    backgroundColor: '#0000ff',
-  },
-  buttonText: {
-    color: '#000',
-    fontWeight: 'bold',
-  },
-  switchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  switchLabel: {
-    fontSize: 16,
-    marginRight: 8,
-  },
-  loadingContainer: {
-    marginTop: 50,
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-  },
-  tableContainer: {
-    flex: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-  },
-  tableHeader: {
-    backgroundColor: '#ccc',
-  },
-  tableRow: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  headerCell: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  cellText: {
-    fontSize: 12,
-    color: '#000',
-  },
-  teamIcon: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    marginRight: 4,
-  },
-  placeholderIcon: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#ccc',
-    marginRight: 4,
-  },
-  teamName: {
-    fontWeight: '600',
-    flex: 1,
-    flexWrap: 'wrap',
-  },
-  numCell: {
-    textAlign: 'right',
-  },
-});

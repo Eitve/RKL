@@ -20,14 +20,14 @@ const CompletedGameItem: React.FC<CompletedGameItemProps> = ({
       <View style={styles.teamRow}>
         <View style={styles.teamInfo}>
           <Image source={{ uri: homeTeam.icon }} style={styles.teamIcon} />
-          <Text style={styles.teamName}>{homeTeam.name}</Text>
+          <Text style={styles.teamName}>{homeTeam.teamName}</Text>
         </View>
         <Text style={styles.teamPoints}>{game.finalPointsHome ?? '-'}</Text>
       </View>
       <View style={styles.teamRow}>
         <View style={styles.teamInfo}>
           <Image source={{ uri: awayTeam.icon }} style={styles.teamIcon} />
-          <Text style={styles.teamName}>{awayTeam.name}</Text>
+          <Text style={styles.teamName}>{awayTeam.teamName}</Text>
         </View>
         <Text style={styles.teamPoints}>{game.finalPointsAway ?? '-'}</Text>
       </View>

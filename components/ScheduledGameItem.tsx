@@ -1,5 +1,3 @@
-// /src/components/ScheduledGameItem.tsx
-
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import { ScheduledGameProps, TeamProps } from '../types';
@@ -19,7 +17,7 @@ const ScheduledGameItem: React.FC<ScheduledGameItemProps> = ({
     <View style={styles.gameContainer}>
       <View style={styles.teamRow}>
         <Image source={{ uri: homeTeam?.icon || '' }} style={styles.teamIcon} />
-        <Text style={styles.teamName}>{homeTeam?.name || scheduledGame.homeTeam}</Text>
+        <Text style={styles.teamName}>{homeTeam?.teamName || scheduledGame.homeTeam}</Text>
       </View>
 
       <View style={styles.vsContainer}>
@@ -28,7 +26,7 @@ const ScheduledGameItem: React.FC<ScheduledGameItemProps> = ({
 
       <View style={styles.teamRow}>
         <Image source={{ uri: awayTeam?.icon || '' }} style={styles.teamIcon} />
-        <Text style={styles.teamName}>{awayTeam?.name || scheduledGame.awayTeam}</Text>
+        <Text style={styles.teamName}>{awayTeam?.teamName || scheduledGame.awayTeam}</Text>
       </View>
 
       <View style={styles.bottomRow}>
