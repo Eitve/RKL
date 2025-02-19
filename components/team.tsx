@@ -1,15 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  Image,
-  StyleSheet,
-  Pressable,
-  FlatList,
-} from 'react-native';
+import { View, Text, Image, StyleSheet, FlatList } from 'react-native';
 import { firestore } from '../app/firebaseConfig';
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
 import { useNavigation } from '@react-navigation/native';
+import Player from './Player';
 
 interface Team {
   teamName?: string;
@@ -30,7 +24,7 @@ interface PlayerData {
 interface TeamScreenNav {
   navigate: (
     screenName: 'PlayerScreen',
-    params: { teamID: string; playerID: string } // Define required navigation parameters
+    params: { teamID: string; playerID: string }
   ) => void;
 }
 
@@ -84,27 +78,12 @@ const Team: React.FC<{ teamName: string }> = ({ teamName }) => {
     return <Text>No team data found.</Text>;
   }
 
-  const renderPlayer = ({ item }: { item: PlayerData }) => (
-    <Pressable
-      key={item.id}
-      onPress={() =>
-        navigation.navigate('PlayerScreen', {
-          teamID: teamName, // Pass teamName as teamID
-          playerID: item.id, // Pass the player's document ID
-        })
-      }
-      style={styles.playerRow}
-    >
-      {item.photoURL ? (
-        <Image source={{ uri: item.photoURL }} style={styles.playerImage} />
-      ) : (
-        <View style={[styles.playerImage, { backgroundColor: '#ccc' }]} />
-      )}
-      <Text style={styles.playerName}>
-        {item.firstName ?? 'Unknown'} {item.lastName ?? ''}
-      </Text>
-    </Pressable>
-  );
+  const handlePlayerPress = (playerId: string) => {
+    navigation.navigate('PlayerScreen', {
+      teamID: teamName,
+      playerID: playerId,
+    });
+  };
 
   return (
     <View style={styles.container}>
@@ -130,7 +109,9 @@ const Team: React.FC<{ teamName: string }> = ({ teamName }) => {
       <FlatList
         data={players}
         keyExtractor={(item) => item.id}
-        renderItem={renderPlayer}
+        renderItem={({ item }) => (
+          <Player player={item} onPress={handlePlayerPress} />
+        )}
         nestedScrollEnabled
         contentContainerStyle={{ paddingBottom: 20 }}
       />
@@ -168,19 +149,5 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginTop: 20,
     marginBottom: 10,
-  },
-  playerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  playerImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 10,
-  },
-  playerName: {
-    fontSize: 16,
   },
 });
