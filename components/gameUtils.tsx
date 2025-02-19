@@ -1,3 +1,4 @@
+import { TeamProps } from '@/types';
 import { Timestamp } from 'firebase/firestore';
 
 // Function to remove Lithuanian characters and make all lowercase
@@ -16,7 +17,7 @@ export function normalizeID(input: string): string {
       .replace(/\s+/g, ''); // Removes spaces
   }
   
-  // Function to compute additional statistics for a box score row
+// Function to compute additional statistics for a box score row
   export function computePlayerStats(boxScoreRow: any): any {
     const twoPointMade = boxScoreRow['2PM'] ?? 0;
     const twoPointAttempted = boxScoreRow['2PA'] ?? 0;
@@ -80,4 +81,30 @@ export function normalizeID(input: string): string {
   export function isDivisionMatch(gameDivision: 'A' | 'B', isDivisionBSelected: boolean): boolean {
     return gameDivision === (isDivisionBSelected ? 'B' : 'A');
 }
-  
+
+// Sorts teams by standingPoints, then ptsDifference, then teamName.
+export const sortTeams = (teams: TeamProps[]): TeamProps[] => {
+  return [...teams].sort((a, b) => {
+    if ((b.standingPoints ?? 0) !== (a.standingPoints ?? 0)) {
+      return (b.standingPoints ?? 0) - (a.standingPoints ?? 0);
+    }
+    if ((b.ptsDifference ?? 0) !== (a.ptsDifference ?? 0)) {
+      return (b.ptsDifference ?? 0) - (a.ptsDifference ?? 0);
+    }
+    return (a.teamName ?? '').localeCompare(b.teamName ?? '');
+  });
+};
+
+// Sets color of the standing number based on standing of the team (I couldve just made this raw I think, but this is more fun)
+export const getPlaceTextColor = (place: number, division?: string) => {
+  if (division === 'A') {
+    if (place >= 1 && place <= 4) return { color: 'green' };
+    if (place >= 5 && place <= 12) return { color: 'yellow' };
+    if (place === 13 || place === 14) return { color: 'black' };
+    if (place === 15 || place === 16) return { color: 'red' };
+  } else if (division?.startsWith('B')) {
+    if (place >= 1 && place <= 8) return { color: 'green' };
+    if (place >= 9 && place <= 13) return { color: 'black' };
+  }
+  return {};
+};

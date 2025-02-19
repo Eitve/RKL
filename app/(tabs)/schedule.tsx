@@ -1,5 +1,3 @@
-// /src/screens/ScheduleScreen.tsx
-
 import React, { useState, useEffect } from 'react';
 import { SafeAreaView, View, Text, FlatList, Switch } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -39,7 +37,7 @@ const ScheduleScreen = () => {
           const data = doc.data() as any;
           teamMap.set(data.teamID, {
             id: data.teamID,
-            name: data.teamName || doc.id,
+            teamName: data.teamName || doc.id,
             icon: data.icon || '',
           });
         });

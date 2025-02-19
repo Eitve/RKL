@@ -2,9 +2,11 @@ export type GameProps = {
     gameID: number;
     homeTeam: string;
     awayTeam: string;
-    finalPointsHome: number | null;
-    finalPointsAway: number | null;
+    finalPointsHome: number;
+    finalPointsAway: number;
     division: 'A' | 'B';
+    winner?: string;
+    loser?: string;
   };
   
   export type ScheduledGameProps = {
@@ -18,7 +20,15 @@ export type GameProps = {
   
   export type TeamProps = {
     id: string;
-    name: string;
+    teamName: string;
     icon: string;
+    division?: string;
+    gamesPlayed?: number;
+    wins?: number;
+    losses?: number;
+    ptsMinus?: number;
+    ptsPlus?: number;
+    ptsDifference?: number;
+    standingPoints?: number;
   };
   
