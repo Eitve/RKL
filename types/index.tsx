@@ -64,4 +64,12 @@ export type GameProps = {
     blocks: number;
     minutes: string;
   }
+
+  export interface NewsItem {
+    id: string;
+    title: string;
+    content: string;
+    imageURL: string;
+    number: number;
+  }
   
