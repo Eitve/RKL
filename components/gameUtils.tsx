@@ -108,3 +108,10 @@ export const getPlaceTextColor = (place: number, division?: string) => {
   }
   return {};
 };
+
+// Turns seconds into mm:ss
+export function formatMinutes(totalSeconds: number): string {
+  const mins = Math.floor(totalSeconds / 60);
+  const secs = totalSeconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}

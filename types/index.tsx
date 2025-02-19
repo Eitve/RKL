@@ -32,3 +32,36 @@ export type GameProps = {
     standingPoints?: number;
   };
   
+  export interface PlayerDoc {
+    firstName?: string;
+    lastName?: string;
+    dob?: string;
+    age?: number;
+    nationality?: string;
+    height?: number;
+    weight?: number;
+    photoURL?: string;
+    shirtNumber?: number;
+    position?: string;
+    avgPTS?: number;
+    avgREB?: number;
+    avgAST?: number;
+    avgSTL?: number;
+    avgBLK?: number;
+    avgSecs?: number;
+    gamesPlayed?: number;
+  }
+  
+  export interface GameStats {
+    gameID: string;
+    finalScore: string;
+    opponentTeamName: string; 
+    isWin: boolean;
+    points: number;
+    rebounds: number;
+    assists: number;
+    steals: number;
+    blocks: number;
+    minutes: string;
+  }
+  

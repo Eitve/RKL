@@ -29,7 +29,8 @@ export type StandingsStackParamList = {
 };
 export type StatisticsStackParamList = {
   StatisticsMain: undefined;
-  PlayerScreen: { playerID: string; teamID: string }; // or whatever your PlayerScreen requires
+  PlayerScreen: { playerID: string; teamID: string };
+  GameDetails: { gameID: number; };
 };
 
 const Tab = createBottomTabNavigator();
