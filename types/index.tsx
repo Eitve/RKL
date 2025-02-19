@@ -65,3 +65,65 @@ export type GameProps = {
     minutes: string;
   }
   
+  export type PlayerAggregatedStats = {
+    id: string;
+    firstName: string;
+    lastName: string;
+    position: string;
+    photoURL: string;
+    teamName: string;
+    twoPM: number;
+    twoPA: number;
+    threePM: number;
+    threePA: number;
+    FTM: number;
+    FTA: number;
+    offReb: number;
+    defReb: number;
+    ast: number;
+    stl: number;
+    blk: number;
+    tov: number;
+    pf: number;
+    plusMinus: number;
+    pts: number;
+    secs: number;
+    eff: number;
+    gamesPlayed: number;
+  };
+  
+  export type BoxScoreDoc = {
+    name: string;
+    '2PM'?: number;
+    '2PA'?: number;
+    '3PM'?: number;
+    '3PA'?: number;
+    FTM?: number;
+    FTA?: number;
+    OFFREB?: number;
+    DEFFREB?: number;
+    AST?: number;
+    STL?: number;
+    BLK?: number;
+    TOV?: number;
+    PF?: number;
+    PLUSMINUS?: number;
+    PTS?: number;
+    secs?: number;
+    EFF?: number;
+  };
+  
+  export type PositionFilter = 'ALL' | 'PG' | 'SG' | 'SF' | 'PF' | 'C';
+  
+  export type StatFilter =
+    | 'PTS'
+    | 'REB'
+    | 'AST'
+    | 'STL'
+    | 'BLK'
+    | 'FG%'
+    | '2PT%'
+    | '3PT%'
+    | 'FT%'
+    | 'EFF';
+  

@@ -1,78 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, FlatList, TouchableOpacity, Image, } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, FlatList } from 'react-native';
 import { firestore } from '../firebaseConfig';
-import { collection, getDocs, doc, QuerySnapshot, DocumentData, updateDoc, } from 'firebase/firestore';
+import { collection, getDocs, doc, QuerySnapshot, DocumentData, updateDoc } from 'firebase/firestore';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { StatisticsStackParamList } from './_layout';
-function toMMSS(totalSecs: number): string {
-  const mm = Math.floor(totalSecs / 60);
-  const ss = totalSecs % 60;
-  const mmStr = mm.toString();
-  const ssStr = ss < 10 ? `0${ss}` : `${ss}`;
-  return `${mmStr}:${ssStr}`;
-}
-
-type PlayerAggregatedStats = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  position: string;
-  photoURL: string;
-  teamName: string;
-  twoPM: number;
-  twoPA: number;
-  threePM: number;
-  threePA: number;
-  FTM: number;
-  FTA: number;
-  offReb: number;
-  defReb: number;
-  ast: number;
-  stl: number;
-  blk: number;
-  tov: number;
-  pf: number;
-  plusMinus: number;
-  pts: number;
-  secs: number;
-  eff: number;
-  gamesPlayed: number;
-};
-
-type BoxScoreDoc = {
-  name: string;
-  '2PM'?: number;
-  '2PA'?: number;
-  '3PM'?: number;
-  '3PA'?: number;
-  FTM?: number;
-  FTA?: number;
-  OFFREB?: number;
-  DEFFREB?: number;
-  AST?: number;
-  STL?: number;
-  BLK?: number;
-  TOV?: number;
-  PF?: number;
-  PLUSMINUS?: number;
-  PTS?: number;
-  secs?: number;
-  EFF?: number;
-};
-
-type PositionFilter = 'ALL' | 'PG' | 'SG' | 'SF' | 'PF' | 'C';
-type StatFilter =
-  | 'PTS'
-  | 'REB'
-  | 'AST'
-  | 'STL'
-  | 'BLK'
-  | 'FG%'
-  | '2PT%'
-  | '3PT%'
-  | 'FT%'
-  | 'EFF';
+import { PlayerAggregatedStats, BoxScoreDoc, PositionFilter, StatFilter } from '../../types';
+import FilterRow from '../../components/FilterRow';
+import PlayerRow from '../../components/PlayerRow';
 
 type StatisticsNavigationProp = NativeStackNavigationProp<
   StatisticsStackParamList,
@@ -84,7 +19,6 @@ const StatisticsScreen: React.FC = () => {
 
   const [playersMap, setPlayersMap] = useState<Record<string, PlayerAggregatedStats>>({});
   const [loading, setLoading] = useState(true);
-
   const [positionFilter, setPositionFilter] = useState<PositionFilter>('ALL');
   const [statFilter, setStatFilter] = useState<StatFilter>('PTS');
 
@@ -185,6 +119,7 @@ const StatisticsScreen: React.FC = () => {
 
         setPlayersMap({ ...aggregator });
 
+        // Update player stats in the database
         for (const [key, st] of Object.entries(aggregator)) {
           const [teamID, playerID] = key.split('-');
           if (!teamID || !playerID) continue;
@@ -210,9 +145,6 @@ const StatisticsScreen: React.FC = () => {
           let ftPct = 0;
           if (st.FTA > 0) ftPct = (st.FTM / st.FTA) * 100;
 
-          const avgEFF = st.eff / gp;
-          const avgSecs = st.secs / gp;
-
           try {
             await updateDoc(doc(firestore, 'teams', teamID, 'players', playerID), {
               gamesPlayed: st.gamesPlayed,
@@ -225,9 +157,9 @@ const StatisticsScreen: React.FC = () => {
               twoPtPct,
               threePtPct,
               ftPct,
-              avgEFF,
+              avgEFF: st.eff / gp,
               secs: st.secs,
-              avgSecs,
+              avgSecs: st.secs / gp,
               avgTOV: st.tov / gp,
               avgPF: st.pf / gp,
               avgPlusMinus: st.plusMinus / gp,
@@ -294,82 +226,6 @@ const StatisticsScreen: React.FC = () => {
 
   const leaders = getFilteredSortedPlayers();
 
-  const renderLeader = ({ item }: { item: PlayerAggregatedStats }) => {
-    const gp = item.gamesPlayed || 1;
-    const mmss = toMMSS(Math.round(item.secs / gp));
-
-    const val = (() => {
-      const gp = item.gamesPlayed || 1;
-      switch (statFilter) {
-        case 'PTS':
-          return item.pts / gp;
-        case 'REB':
-          return (item.offReb + item.defReb) / gp;
-        case 'AST':
-          return item.ast / gp;
-        case 'STL':
-          return item.stl / gp;
-        case 'BLK':
-          return item.blk / gp;
-        case 'FG%': {
-          const made = item.twoPM + item.threePM;
-          const att = item.twoPA + item.threePA;
-          return att ? (made / att) * 100 : 0;
-        }
-        case '2PT%':
-          return item.twoPA ? (item.twoPM / item.twoPA) * 100 : 0;
-        case '3PT%':
-          return item.threePA ? (item.threePM / item.threePA) * 100 : 0;
-        case 'FT%':
-          return item.FTA ? (item.FTM / item.FTA) * 100 : 0;
-        case 'EFF':
-          return item.eff / gp;
-        default:
-          return 0;
-      }
-    })();
-
-    const statDisplay = statFilter.includes('%')
-      ? `${val.toFixed(1)}%`
-      : val.toFixed(1);
-
-    const handlePress = () => {
-      const [teamID, playerID] = item.id.split('-');
-      navigation.navigate('PlayerScreen', {
-        teamID,
-        playerID,
-      });
-    };
-
-    return (
-      <TouchableOpacity style={styles.playerRow} onPress={handlePress}>
-        {item.photoURL ? (
-          <Image source={{ uri: item.photoURL }} style={styles.playerImage} />
-        ) : (
-          <View style={[styles.playerImage, { backgroundColor: '#ccc' }]} />
-        )}
-        <View style={{ marginLeft: 10, flex: 1 }}>
-          <Text style={styles.playerName}>
-            {item.firstName} {item.lastName} (GP: {gp}, Mins/G: {mmss})
-          </Text>
-          <Text style={styles.teamName}>{item.teamName}</Text>
-        </View>
-        <View style={{ alignItems: 'flex-end' }}>
-          <Text style={styles.statValue}>
-            {statFilter}: {statDisplay}
-          </Text>
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
-  const handlePositionPress = (pos: PositionFilter) => {
-    setPositionFilter(pos);
-  };
-  const handleStatPress = (stat: StatFilter) => {
-    setStatFilter(stat);
-  };
-
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -383,42 +239,31 @@ const StatisticsScreen: React.FC = () => {
     <View style={styles.container}>
       <Text style={styles.title}>Stats Leaders</Text>
 
-      <View style={styles.filterRow}>
-        {(['ALL', 'PG', 'SG', 'SF', 'PF', 'C'] as const).map((pos) => (
-          <TouchableOpacity
-            key={pos}
-            style={[
-              styles.filterButton,
-              positionFilter === pos && styles.filterButtonSelected,
-            ]}
-            onPress={() => handlePositionPress(pos)}
-          >
-            <Text style={styles.filterButtonText}>{pos}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <FilterRow
+        options={['ALL', 'PG', 'SG', 'SF', 'PF', 'C']}
+        selected={positionFilter}
+        onSelect={(option) => setPositionFilter(option as PositionFilter)}
+      />
 
-      <View style={styles.filterRow}>
-        {(['PTS', 'REB', 'AST', 'STL', 'BLK', 'FG%', '2PT%', '3PT%', 'FT%', 'EFF'] as const).map(
-          (s) => (
-            <TouchableOpacity
-              key={s}
-              style={[
-                styles.filterButton,
-                statFilter === s && styles.filterButtonSelected,
-              ]}
-              onPress={() => handleStatPress(s)}
-            >
-              <Text style={styles.filterButtonText}>{s}</Text>
-            </TouchableOpacity>
-          )
-        )}
-      </View>
+      <FilterRow
+        options={['PTS', 'REB', 'AST', 'STL', 'BLK', 'FG%', '2PT%', '3PT%', 'FT%', 'EFF']}
+        selected={statFilter}
+        onSelect={(option) => setStatFilter(option as StatFilter)}
+      />
 
       <FlatList
         data={leaders}
         keyExtractor={(item) => item.id}
-        renderItem={renderLeader}
+        renderItem={({ item }) => (
+          <PlayerRow
+            player={item}
+            statFilter={statFilter}
+            onPress={() => {
+              const [teamID, playerID] = item.id.split('-');
+              navigation.navigate('PlayerScreen', { teamID, playerID });
+            }}
+          />
+        )}
         contentContainerStyle={{ paddingBottom: 30 }}
       />
     </View>
@@ -444,49 +289,5 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     alignSelf: 'center',
     marginBottom: 10,
-  },
-  filterRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 5,
-    flexWrap: 'wrap',
-  },
-  filterButton: {
-    backgroundColor: '#ccc',
-    padding: 8,
-    margin: 4,
-    borderRadius: 4,
-  },
-  filterButtonSelected: {
-    backgroundColor: '#007bff',
-  },
-  filterButtonText: {
-    color: '#000',
-    fontWeight: 'bold',
-  },
-  playerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f2f2f2',
-    marginVertical: 6,
-    padding: 10,
-    borderRadius: 6,
-  },
-  playerImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-  },
-  playerName: {
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  teamName: {
-    fontSize: 12,
-    color: '#666',
-  },
-  statValue: {
-    fontSize: 14,
-    fontWeight: 'bold',
   },
 });
