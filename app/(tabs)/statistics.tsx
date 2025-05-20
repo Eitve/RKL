@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -6,14 +6,15 @@ import {
   ActivityIndicator,
   FlatList,
   TouchableOpacity,
+  Modal,
+  Pressable,
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { firestore } from '../firebaseConfig';
 import {
   collection,
   getDocs,
   doc,
-  QuerySnapshot,
-  updateDoc,
 } from 'firebase/firestore';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -23,7 +24,8 @@ import { LeaderItem } from '../../components/LeaderItem';
 /* ─────────────────── Types ─────────────────── */
 
 type PositionFilter = 'ALL' | 'PG' | 'SG' | 'SF' | 'PF' | 'C';
-type StatFilter =
+// NOTE: "PTS" is treated as Points‑Per‑Game (PPG) in the UI label
+export type StatFilter =
   | 'PTS' | 'REB' | 'AST' | 'STL' | 'BLK'
   | 'FG%' | '2PT%' | '3PT%' | 'FT%' | 'EFF';
 
@@ -49,7 +51,16 @@ type StatisticsNavigationProp = NativeStackNavigationProp<
   'StatisticsMain'
 >;
 
-/* ───────────────── Helper ───────────────── */
+/* ───────────────── Constants ───────────────── */
+
+const POSITION_OPTIONS: PositionFilter[] = ['ALL', 'PG', 'SG', 'SF', 'PF', 'C'];
+const STAT_OPTIONS: StatFilter[] = ['PTS','REB','AST','STL','BLK','FG%','2PT%','3PT%','FT%','EFF'];
+// Division filter placeholder – extend when you have divisions in your data model
+const DIV_OPTIONS: string[] = ['ALL'];
+
+/* ───────────────── Helpers ───────────────── */
+
+
 
 const getStatValueFactory = (filter: StatFilter) => (p: PlayerAggregatedStats) => {
   const gp = p.gamesPlayed || 1;
@@ -74,22 +85,64 @@ const getStatValueFactory = (filter: StatFilter) => (p: PlayerAggregatedStats) =
 
 const getRankText =
   (getStat: (p: PlayerAggregatedStats) => number) =>
-  (index: number, arr: PlayerAggregatedStats[]) =>
-{
-  const cur = getStat(arr[index]);
-  const prev = index > 0 ? getStat(arr[index - 1]) : null;
-  return prev !== null && cur === prev ? `T-${index + 1}.` : `${index + 1}.`;
+  (index: number, arr: PlayerAggregatedStats[]) => {
+    const cur  = getStat(arr[index]);
+    const prev = index > 0 ? getStat(arr[index - 1]) : null;
+    // Tie detection → prepend "T-"
+    return prev !== null && cur === prev ? `T-${index + 1}.` : `${index + 1}.`;
+  };
+
+/* ───────────────── UI sub‑components ───────────────── */
+
+type PillProps = {
+  label: string;   // e.g. "STAT"
+  value: string;   // e.g. "PPG" / "ALL"
+  onPress: () => void;
 };
+
+const FilterPill: React.FC<PillProps> = ({ label, value, onPress }) => (
+  <TouchableOpacity style={pillStyles.pill} onPress={onPress} activeOpacity={0.7}>
+    <Text style={pillStyles.label}>{label}: </Text>
+    <Text style={pillStyles.value}>{value}</Text>
+    <Feather name="chevron-down" size={16} color="#fff" style={{ marginLeft: 2 }} />
+  </TouchableOpacity>
+);
+
+const pillStyles = StyleSheet.create({
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#265C3A',   // dark green
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 9999,           // pill shape
+    marginHorizontal: 4,
+    elevation: 3,                 // Android shadow
+    shadowColor: '#000',          // iOS shadow
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  label: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  value: { color: '#fff', fontWeight: '700', fontSize: 14 },
+});
 
 /* ───────────────── Component ───────────────── */
 
 const StatisticsScreen: React.FC = () => {
   const navigation = useNavigation<StatisticsNavigationProp>();
 
-  const [playersMap, setPlayersMap] = useState<Record<string, PlayerAggregatedStats>>({});
-  const [loading, setLoading]       = useState(true);
-  const [positionFilter, setPositionFilter] = useState<PositionFilter>('ALL');
-  const [statFilter, setStatFilter]         = useState<StatFilter>('PTS');
+  // Core state
+  const [playersMap,      setPlayersMap]      = useState<Record<string, PlayerAggregatedStats>>({});
+  const [loading,         setLoading]         = useState(true);
+  const [positionFilter,  setPositionFilter]  = useState<PositionFilter>('ALL');
+  const [statFilter,      setStatFilter]      = useState<StatFilter>('PTS');
+  const [divFilter,       setDivFilter]       = useState<string>('ALL');   // future use
+
+  // Local UI state for modal visibility
+  const [showPosSel,      setShowPosSel]      = useState(false);
+  const [showStatSel,     setShowStatSel]     = useState(false);
+  const [showDivSel,      setShowDivSel]      = useState(false);
 
   /* ──────────────── Fetch / Aggregate ──────────────── */
   useEffect(() => {
@@ -126,7 +179,7 @@ const StatisticsScreen: React.FC = () => {
           });
         }
 
-        /* 2. Sum box-scores */
+        /* 2. Sum box‑scores */
         const gSnap = await getDocs(collection(firestore, 'games'));
         for (const gDoc of gSnap.docs) {
           const gRef = doc(firestore, 'games', gDoc.id);
@@ -143,10 +196,8 @@ const StatisticsScreen: React.FC = () => {
               if (!key) return;
 
               const a = agg[key];
-              a.twoPM += b['2PM'] || 0;
-              a.twoPA += b['2PA'] || 0;
-              a.threePM += b['3PM'] || 0;
-              a.threePA += b['3PA'] || 0;
+              a.twoPM += b['2PM'] || 0; a.twoPA += b['2PA'] || 0;
+              a.threePM += b['3PM'] || 0; a.threePA += b['3PA'] || 0;
               a.FTM  += b.FTM  || 0;   a.FTA  += b.FTA  || 0;
               a.offReb += b.OFFREB || 0; a.defReb += b.DEFFREB || 0;
               a.ast += b.AST || 0;  a.stl += b.STL || 0;  a.blk += b.BLK || 0;
@@ -159,7 +210,6 @@ const StatisticsScreen: React.FC = () => {
         }
 
         setPlayersMap({ ...agg });
-        /* 3. (Optional) push per-player averages back to Firestore … */
       } catch (err) {
         console.error(err);
       } finally {
@@ -172,16 +222,18 @@ const StatisticsScreen: React.FC = () => {
 
   /* ──────────────── Derived data ──────────────── */
 
-  const getStatValue = React.useMemo(() => getStatValueFactory(statFilter), [statFilter]);
-  const leaders = React.useMemo(() => {
+  const getStatValue = useMemo(() => getStatValueFactory(statFilter), [statFilter]);
+
+  const leaders = useMemo(() => {
     let list = Object.values(playersMap);
     if (positionFilter !== 'ALL') {
       list = list.filter((p) => p.position.toUpperCase().includes(positionFilter));
     }
+    // *When division filtering is implemented, add it here.*
     return list.sort((a, b) => getStatValue(b) - getStatValue(a));
-  }, [playersMap, positionFilter, getStatValue]);
+  }, [playersMap, positionFilter, divFilter, getStatValue]);
 
-  const rankLabel = React.useMemo(() => getRankText(getStatValue), [getStatValue]);
+  const rankLabel = useMemo(() => getRankText(getStatValue), [getStatValue]);
 
   /* ──────────────── Render ──────────────── */
 
@@ -198,35 +250,23 @@ const StatisticsScreen: React.FC = () => {
     <View style={styles.container}>
       <Text style={styles.title}>Stats Leaders</Text>
 
-      {/* Filters */}
-      <View style={styles.filterRow}>
-        {(['ALL', 'PG', 'SG', 'SF', 'PF', 'C'] as const).map((pos) => (
-          <TouchableOpacity
-            key={pos}
-            style={[
-              styles.filterBtn,
-              positionFilter === pos && styles.filterBtnActive,
-            ]}
-            onPress={() => setPositionFilter(pos)}
-          >
-            <Text style={styles.filterTxt}>{pos}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <View style={styles.filterRow}>
-        {(['PTS','REB','AST','STL','BLK','FG%','2PT%','3PT%','FT%','EFF'] as const).map((s) => (
-          <TouchableOpacity
-            key={s}
-            style={[
-              styles.filterBtn,
-              statFilter === s && styles.filterBtnActive,
-            ]}
-            onPress={() => setStatFilter(s)}
-          >
-            <Text style={styles.filterTxt}>{s}</Text>
-          </TouchableOpacity>
-        ))}
+      {/* ─────────── PILL FILTERS ─────────── */}
+      <View style={styles.pillRow}>
+        <FilterPill
+          label="STAT"
+          value={statFilter === 'PTS' ? 'PPG' : statFilter}
+          onPress={() => setShowStatSel(true)}
+        />
+        <FilterPill
+          label="POS"
+          value={positionFilter}
+          onPress={() => setShowPosSel(true)}
+        />
+        <FilterPill
+          label="DIV"
+          value={divFilter}
+          onPress={() => setShowDivSel(true)}
+        />
       </View>
 
       {/* Leader list */}
@@ -246,9 +286,72 @@ const StatisticsScreen: React.FC = () => {
         )}
         contentContainerStyle={{ paddingBottom: 30 }}
       />
+
+      {/* ─────────── SELECTOR MODALS ─────────── */}
+      {/* Re‑usable generic modal */}
+      {showStatSel && (
+        <OptionModal
+          options={STAT_OPTIONS}
+          getLabel={(v) => (v === 'PTS' ? 'PPG' : v)}
+          onSelect={(v) => setStatFilter(v as StatFilter)}
+          onRequestClose={() => setShowStatSel(false)}
+        />
+      )}
+
+      {showPosSel && (
+        <OptionModal
+          options={POSITION_OPTIONS}
+          onSelect={(v) => setPositionFilter(v as PositionFilter)}
+          onRequestClose={() => setShowPosSel(false)}
+        />
+      )}
+
+      {showDivSel && (
+        <OptionModal
+          options={DIV_OPTIONS}
+          onSelect={(v) => setDivFilter(v)}
+          onRequestClose={() => setShowDivSel(false)}
+        />
+      )}
     </View>
   );
 };
+
+/* ──────────────── Option Modal ──────────────── */
+
+type OptionModalProps<T extends string> = {
+  options: readonly T[] | T[];
+  getLabel?: (v: T) => string;
+  onSelect: (value: T) => void;
+  onRequestClose: () => void;
+};
+
+function OptionModal<T extends string>({ options, getLabel, onSelect, onRequestClose }: OptionModalProps<T>) {
+  return (
+    <Modal transparent animationType="fade" onRequestClose={onRequestClose}>
+      <Pressable style={modalStyles.backdrop} onPress={onRequestClose}>
+        <View style={modalStyles.box}>
+          {options.map((opt) => (
+            <TouchableOpacity
+              key={opt}
+              style={modalStyles.item}
+              onPress={() => { onSelect(opt); onRequestClose(); }}
+            >
+              <Text style={modalStyles.itemText}>{getLabel ? getLabel(opt) : opt}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </Pressable>
+    </Modal>
+  );
+}
+
+const modalStyles = StyleSheet.create({
+  backdrop:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.25)', justifyContent: 'center', alignItems: 'center' },
+  box:        { backgroundColor: '#fff', borderRadius: 12, paddingVertical: 8, width: 260, elevation: 5, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 3 } },
+  item:       { paddingVertical: 14, alignItems: 'center' },
+  itemText:   { fontSize: 16, fontWeight: '600' },
+});
 
 /* ───────────────── Styles ───────────────── */
 
@@ -257,10 +360,12 @@ const styles = StyleSheet.create({
   centered:   { flex: 1, alignItems: 'center', justifyContent: 'center' },
   title:      { fontSize: 22, fontWeight: 'bold', alignSelf: 'center', marginBottom: 10 },
 
-  filterRow:  { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', marginBottom: 5 },
-  filterBtn:  { backgroundColor: '#ccc', padding: 8, margin: 4, borderRadius: 4 },
-  filterBtnActive: { backgroundColor: '#007bff' },
-  filterTxt:  { color: '#000', fontWeight: 'bold' },
+  pillRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
 });
 
 export default StatisticsScreen;
